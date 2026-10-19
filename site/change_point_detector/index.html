@@ -1,0 +1,1715 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Analyze the accuracy of linear approximations for model kinetics">
+      
+      
+      
+      
+        <link rel="prev" href="../calculating_endtime_using_cv/">
+      
+      
+        <link rel="next" href="../evaluation_metrics/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Change Point Detector - Linearity Analysis</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#change-point-detector" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Linearity Analysis" class="md-header__button md-logo" aria-label="Linearity Analysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Linearity Analysis
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Change Point Detector
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../calculating_characteristic_times/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Calculating Characteristic Times
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../calculating_endtime_using_cv/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Calculating Characteristic Using Coefficient of Variation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Change Point Detector
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../evaluation_metrics/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Evaluation Metrics
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../extract_characteristic_times_from_biomodels_papers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Extracting Characteristic Times from Papers for BioModels
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../find_simulation_end_time/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Find Simulation End Time
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../implementing_piecewise_segmentations/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Piece-wise Linear Approximation for Affine Differential Equations
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../jacobian_estimator/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Jacobian Estimator
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../linear_predictions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Linear Predictions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../model_based_design/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Model-Based Design
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../network_discovery/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Network Discovery
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../perturbation_study/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Perturbation Study
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../piecewise_system_discovery/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Piecewise System Discovery
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../plot_comparison/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  plotComparison
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../research_agenda/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Research Agenda
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../score/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Score Class
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../specification/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Specification for Model Linearity Analysis
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../technical_notes/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Technical Notes
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../bugs/segment_scores/" class="md-tabs__link">
+          
+  
+  
+  Bugs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../references/piecewise_approximatins/" class="md-tabs__link">
+          
+  
+  
+  References
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../superpowers/plans/2026-06-19-piecewise-system-discovery/" class="md-tabs__link">
+          
+  
+  
+  Superpowers
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Linearity Analysis" class="md-nav__button md-logo" aria-label="Linearity Analysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Linearity Analysis
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../calculating_characteristic_times/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calculating Characteristic Times
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../calculating_endtime_using_cv/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calculating Characteristic Using Coefficient of Variation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change Point Detector
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change Point Detector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mathematical-background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mathematical Background
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finding-the-minimal-partition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding the minimal partition
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Finding the minimal partition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multiple-change-points-and-stopping-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple Change Points and Stopping Criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extract_characteristic_times_from_biomodels_papers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extracting Characteristic Times from Papers for BioModels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../find_simulation_end_time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Find Simulation End Time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementing_piecewise_segmentations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piece-wise Linear Approximation for Affine Differential Equations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jacobian_estimator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jacobian Estimator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../linear_predictions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Predictions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model_based_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model-Based Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../network_discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../perturbation_study/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perturbation Study
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../piecewise_system_discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piecewise System Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plot_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plotComparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../research_agenda/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research Agenda
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../score/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Score Class
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../specification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specification for Model Linearity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../technical_notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Technical Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_19" >
+        
+          
+          <label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bugs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_19_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_19">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bugs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bugs/segment_scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Segment Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_20" >
+        
+          
+          <label class="md-nav__link" for="__nav_20" id="__nav_20_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_20_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_20">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../references/piecewise_approximatins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piecewise Affine / Piecewise Linear Differential Systems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_21" >
+        
+          
+          <label class="md-nav__link" for="__nav_21" id="__nav_21_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Superpowers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_21_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_21">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Superpowers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_21_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_21_1" id="__nav_21_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_21_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_21_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../superpowers/plans/2026-06-19-piecewise-system-discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piecewise System Discovery Implementation Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mathematical-background" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mathematical Background
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finding-the-minimal-partition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding the minimal partition
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Finding the minimal partition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multiple-change-points-and-stopping-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple Change Points and Stopping Criteria
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="change-point-detector">Change Point Detector</h1>
+<h2 id="background">Background</h2>
+<p>Detecting change points is critical to adapting systems to nonstationarities. The detector provides an efficient solution for a sequence of univariate data. Given a number of change points, the detector determines how to partition the sequence of the univariate data so as to minimize the adjusted sum of squares (subtracting the mean) of the partitions. Alternatively, the algorithm inputs the minimum reduction in the sum of squares required w.r.t. the total sum of squares, and then finds change points until this criterion is violated.</p>
+<h2 id="mathematical-background">Mathematical Background</h2>
+<p>We make the following notation.</p>
+<ul>
+<li>A <strong>sequence</strong> <span class="arithmatex">\(S\)</span> is a set of contiguous positive integers. The length of the sequence is denoted by <span class="arithmatex">\(|S|\)</span>.
+<span class="arithmatex">\(f_S\)</span> is the first element of the sequence, and <span class="arithmatex">\(l_S = f_S + |S| -1\)</span> is the
+last element of <span class="arithmatex">\(S\)</span>.</li>
+<li><span class="arithmatex">\(U\)</span> is a <strong>subsequence</strong> of the sequence <span class="arithmatex">\(S\)</span> if <span class="arithmatex">\(U\)</span> is a sequence and</li>
+<li><span class="arithmatex">\(f_U \in [f_S, l_S]\)</span>;</li>
+<li><span class="arithmatex">\(l_U \in [f_U, l_S]\)</span>;</li>
+<li><span class="arithmatex">\(\mathcal{P}\)</span> is a <strong>partition</strong> of the sequence <span class="arithmatex">\(S\)</span> iff <span class="arithmatex">\(\mathcal{P} = \{ S_1, \cdots, S_K \}\)</span> where: (a) <span class="arithmatex">\(S_k\)</span> is a subsequence of <span class="arithmatex">\(S\)</span>; (b) <span class="arithmatex">\(l_{S_k} + 1 = f_{S_{k+1}}\)</span> for <span class="arithmatex">\(k &lt; K\)</span>; (c) <span class="arithmatex">\(l_{S_K} = l_S\)</span>; and (d) <span class="arithmatex">\(f_{S_1} = f_S\)</span>.</li>
+<li><span class="arithmatex">\(x_i\)</span> is the <span class="arithmatex">\(i\)</span>-th element in the univariate data.</li>
+<li>Let <span class="arithmatex">\(S\)</span> be a sequence.</li>
+<li><span class="arithmatex">\(sum(X, S) = \sum_{i=f_S}^{l_S}x_i\)</span></li>
+<li><span class="arithmatex">\(sum(XX, S) = \sum_{i=f_S}^{l_S}x^2_i\)</span></li>
+</ul>
+<p>Let <span class="arithmatex">\(S\)</span> be a sequence and
+<span class="arithmatex">\(\mathcal{P}\)</span> be a partition of <span class="arithmatex">\(S\)</span>.</p>
+<ul>
+<li><span class="arithmatex">\(\sum_{S_i \in \mathcal{P}} sum(X, S_i) = sum(X, S)\)</span></li>
+<li><span class="arithmatex">\(\sum_{S_i \in \mathcal{P}} sum(XX, S_i) = sum(XX, S)\)</span></li>
+</ul>
+<p>Next, we calculate <span class="arithmatex">\(A_S\)</span>, the adjusted sum of squares for the sequence <span class="arithmatex">\(S\)</span>
+$$
+\begin{align}
+A_S &amp; = &amp; \sum_{i=f_S}^{l_S} \left(x_i - \frac{sum(X, S)}{|S|} \right)^2 \
+&amp; = &amp; sum(XX, S) -  \frac{sum(X,S)^2}{|S|}
+\end{align}
+$$
+The adjusted sum of squares for a partition is the sum of the adjusted sum of squares for each subsequence in the partition. Let <span class="arithmatex">\(\mathcal{P}\)</span> be a partition of <span class="arithmatex">\(S\)</span>, and <span class="arithmatex">\(A_{\mathcal{P}}\)</span> be the adjusted sum of squares for the partition.
+$$
+A_{\mathcal{P}} = \sum_{S_i \in \mathcal{P}} A_{S_i}
+$$</p>
+<p>Now we consider the sum of adjusted sum of squares for a partition of <span class="arithmatex">\(S\)</span>.
+Consider
+the partition <span class="arithmatex">\(\mathcal{P} = \{S_1, S_2 \}\)</span>.
+$$
+\begin{align}
+A_{S_1} + A_{S_2} &amp; = &amp;
+sum(XX, S_1) -  \frac{sum(X,S_1)^2}{|S_1|}
++ sum(XX, S_2) -  \frac{sum(X,S_2)^2}{|S_2|} \
+&amp; = &amp;
+sum(XX, S) -  \frac{sum(X,S_1)^2}{|S_1|} -  \frac{sum(X,S_2)^2}{|S_2|} \
+\end{align}
+$$
+Thus, we minimize
+<span class="arithmatex">\(A_{S_1} + A_{S_2}\)</span> if we maximize
+<span class="arithmatex">\(\frac{sum(X,S_1)^2}{|S_1|} +  \frac{sum(X,S_2)^2}{|S_2|}\)</span>.
+We refer to such a partition as the <strong>minimal partition</strong> of the sequence <span class="arithmatex">\(S\)</span>.</p>
+<h2 id="finding-the-minimal-partition">Finding the minimal partition</h2>
+<p>Our objective is to find the minimal partition of a subsequence <span class="arithmatex">\(S\)</span> that lies within <span class="arithmatex">\([1, \cdots, N]\)</span>. For a single split point, the algorithm proceeds as follows.</p>
+<p>The inputs to the algorithm are:</p>
+<ul>
+<li>The data values, <span class="arithmatex">\(x_i\)</span>.</li>
+<li>The prefix sums for each element in the sequence:</li>
+<li><span class="arithmatex">\(y_n = \sum_{i=1}^n x_i\)</span>, where <span class="arithmatex">\(y_0 = 0\)</span></li>
+</ul>
+<p>The algorithm proceeds as follows:</p>
+<ol>
+<li>For <span class="arithmatex">\(n \in [f_S+1, l_S]\)</span>:</li>
+<li>Calculate sum of first partition: <span class="arithmatex">\(y'_{n-1} = y_{n-1} - y_{f_S-1}\)</span></li>
+<li>Calculate sum of second partition: <span class="arithmatex">\(z'_n = y_{l_S} - y_{n-1}\)</span></li>
+<li>Calculate signal: <span class="arithmatex">\(s_n = \frac{(y'_{n-1})^2}{n - f_S} + \frac{(z'_n)^2}{l_S - n + 1}\)</span></li>
+<li>Find the change point: <span class="arithmatex">\(n^{\star} = \text{argmax}_n s_n\)</span></li>
+</ol>
+<h3 id="multiple-change-points-and-stopping-criteria">Multiple Change Points and Stopping Criteria</h3>
+<p>To find multiple change points, this process can be applied recursively (Binary Segmentation):</p>
+<ol>
+<li>Find the optimal single split point <span class="arithmatex">\(n^\star\)</span> for the entire sequence <span class="arithmatex">\(S\)</span>.</li>
+<li>Split <span class="arithmatex">\(S\)</span> into <span class="arithmatex">\(S_1 = [f_S, n^\star-1]\)</span> and <span class="arithmatex">\(S_2 = [n^\star, l_S]\)</span>.</li>
+<li>Recursively apply the algorithm to <span class="arithmatex">\(S_1\)</span> and <span class="arithmatex">\(S_2\)</span>.</li>
+</ol>
+<p><strong>Stopping Criteria:</strong></p>
+<ul>
+<li><strong>Fixed number of points</strong>: Stop when <span class="arithmatex">\(K\)</span> change points have been found.</li>
+<li><strong>Minimum Reduction</strong>: A split is only accepted if the reduction in the adjusted sum of squares <span class="arithmatex">\(A_S - (A_{S_1} + A_{S_2})\)</span> exceeds a specified threshold <span class="arithmatex">\(\epsilon \cdot A_{S_{total}}\)</span>, where <span class="arithmatex">\(\epsilon\)</span> is the minimum required relative reduction.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

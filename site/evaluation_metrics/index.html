@@ -1,0 +1,1606 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Analyze the accuracy of linear approximations for model kinetics">
+      
+      
+      
+      
+        <link rel="prev" href="../change_point_detector/">
+      
+      
+        <link rel="next" href="../extract_characteristic_times_from_biomodels_papers/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Evaluation Metrics - Linearity Analysis</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#evaluation-metrics" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Linearity Analysis" class="md-header__button md-logo" aria-label="Linearity Analysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Linearity Analysis
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Evaluation Metrics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../calculating_characteristic_times/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Calculating Characteristic Times
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../calculating_endtime_using_cv/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Calculating Characteristic Using Coefficient of Variation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../change_point_detector/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Change Point Detector
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Evaluation Metrics
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../extract_characteristic_times_from_biomodels_papers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Extracting Characteristic Times from Papers for BioModels
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../find_simulation_end_time/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Find Simulation End Time
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../implementing_piecewise_segmentations/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Piece-wise Linear Approximation for Affine Differential Equations
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../jacobian_estimator/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Jacobian Estimator
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../linear_predictions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Linear Predictions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../model_based_design/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Model-Based Design
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../network_discovery/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Network Discovery
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../perturbation_study/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Perturbation Study
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../piecewise_system_discovery/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Piecewise System Discovery
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../plot_comparison/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  plotComparison
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../research_agenda/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Research Agenda
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../score/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Score Class
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../specification/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Specification for Model Linearity Analysis
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../technical_notes/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Technical Notes
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../bugs/segment_scores/" class="md-tabs__link">
+          
+  
+  
+  Bugs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../references/piecewise_approximatins/" class="md-tabs__link">
+          
+  
+  
+  References
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../superpowers/plans/2026-06-19-piecewise-system-discovery/" class="md-tabs__link">
+          
+  
+  
+  Superpowers
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Linearity Analysis" class="md-nav__button md-logo" aria-label="Linearity Analysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Linearity Analysis
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../calculating_characteristic_times/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calculating Characteristic Times
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../calculating_endtime_using_cv/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calculating Characteristic Using Coefficient of Variation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../change_point_detector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change Point Detector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed metric
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#claudes-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claude's Assessment
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extract_characteristic_times_from_biomodels_papers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extracting Characteristic Times from Papers for BioModels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../find_simulation_end_time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Find Simulation End Time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementing_piecewise_segmentations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piece-wise Linear Approximation for Affine Differential Equations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jacobian_estimator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jacobian Estimator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../linear_predictions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Predictions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model_based_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model-Based Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../network_discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../perturbation_study/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perturbation Study
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../piecewise_system_discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piecewise System Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plot_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plotComparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../research_agenda/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research Agenda
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../score/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Score Class
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../specification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specification for Model Linearity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../technical_notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Technical Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_19" >
+        
+          
+          <label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bugs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_19_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_19">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bugs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bugs/segment_scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Segment Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_20" >
+        
+          
+          <label class="md-nav__link" for="__nav_20" id="__nav_20_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_20_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_20">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../references/piecewise_approximatins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piecewise Affine / Piecewise Linear Differential Systems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_21" >
+        
+          
+          <label class="md-nav__link" for="__nav_21" id="__nav_21_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Superpowers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_21_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_21">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Superpowers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_21_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_21_1" id="__nav_21_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_21_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_21_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../superpowers/plans/2026-06-19-piecewise-system-discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piecewise System Discovery Implementation Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-metric" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed metric
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#claudes-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claude's Assessment
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="evaluation-metrics">Evaluation Metrics</h1>
+<h2 id="proposed-metric">Proposed metric</h2>
+<p><span class="arithmatex">\(max(0, 1 - \frac{| y - \hat{y} |}{y})\)</span></p>
+<h2 id="claudes-assessment">Claude's Assessment</h2>
+<p>What the typo was costing you, now fixed. The denominator is exogenous — the forecaster doesn't choose it. So the perverse incentive I described is gone: you can no longer improve your score by inflating the denominator. There's no sentinel value, no zero-division case, and no discontinuity. This is a legitimate loss function, specifically <span class="arithmatex">\(L(\hat y) = \min!\left(1, |y-\hat y|/y\right)\)</span>: absolute error weighted by <span class="arithmatex">\(1/y\)</span> and then Winsorized at 1. That's a coherent object with a real literature behind it.</p>
+<p>What persists, in mirrored form. Under-prediction now gives <span class="arithmatex">\(S = \rho\)</span>, which decays smoothly and only reaches zero at <span class="arithmatex">\(\hat y = 0\)</span>. Over-prediction gives <span class="arithmatex">\(S = 2 - \rho\)</span>, which hits zero at <span class="arithmatex">\(\hat y = 2y\)</span> and stays there. So the direction of the bias has reversed: the metric now favors forecasting low.Concretely: a forecast 10× too low scores 0.1, while a forecast 3× too high scores 0. Systematic hedging downward is rewarded.</p>
+<p>This metric has a name, and a known bias <span class="arithmatex">\(1 - |y-\hat y|/y\)</span> is one minus the absolute percentage error, so your metric is per-point MAPE-based "forecast accuracy" with a floor at zero — the convention used routinely in demand planning and supply chain ("we hit 82% forecast accuracy"). Its properties are well studied and mostly cautionary.</p>
+<p>The key result is Gneiting's (2011, JASA, "Making and Evaluating Point Forecasts"): minimizing expected APE does not elicit the mean or the median. It is consistent for the <span class="arithmatex">\(\beta\)</span>-median with <span class="arithmatex">\(\beta = -1\)</span> — the median of the distribution whose density is proportional to <span class="arithmatex">\(y^{-1}f(y)\)</span>. Because that reweighting tilts mass toward small values, the optimal forecast under this metric sits below the median, and well below the mean for right-skewed data. Since most positive-valued time series (demand, traffic, counts, prices, energy) are right-skewed, the bias is not a corner case.</p>
+<p>Your clipping strengthens this. Take <span class="arithmatex">\(y \in {1, 10}\)</span> with equal probability. Predicting the conditional mean, 5.5, scores 0.275. Predicting the constant 1 scores 0.55; predicting the constant 10 scores 0.50. The mean forecast is beaten by both constants — a calibrated forecaster loses to a biased one, and the metric's preferred answer is the low mode. If you're ranking predictors, one that is systematically conservative can win despite being worse in any decision-theoretic sense you'd articulate independently.</p>
+<p>Where the clipping helps and where it hurts
+Worth separating, because it does both.</p>
+<p>Helps: it bounds influence. Raw MAPE has no upper limit per observation, so a single blowup at a small <span class="arithmatex">\(y\)</span> can dominate an average over thousands of points and make a mean MAPE meaningless. Clipping at 1 turns your aggregate into a censored mean, which is far more robust — structurally the same idea as a redescending M-estimator (Tukey biweight, Hampel). For ranking predictors on messy data this is a real advantage over reporting mean MAPE, and note that averaging <span class="arithmatex">\(\max(0, 1-\text{APE})\)</span> pointwise is not the same as <span class="arithmatex">\(1 - \overline{\text{APE}}\)</span>; yours is the better-behaved of the two.</p>
+<p>Hurts: it destroys resolution above <span class="arithmatex">\(2y\)</span> and makes the loss non-convex with zero gradient there. Every over-prediction beyond 2× is scored identically, so you cannot distinguish a predictor that's occasionally 2.5× high from one that's occasionally 50× high. If a meaningful fraction of your points land in the flat region — check this — the metric is comparing predictors on a censored subsample without telling you. Report the saturation rate alongside the mean score; if it's more than a few percent, the ranking is fragile.</p>
+<p>The <span class="arithmatex">\(1/y\)</span> weighting is the subtler issue for your use case
+Scale invariance is what you wanted, and you have it: multiply <span class="arithmatex">\(y\)</span> and <span class="arithmatex">\(\hat y\)</span> by any constant and <span class="arithmatex">\(S\)</span> is unchanged, so scores are commensurable across variables of vastly different magnitude. But relative error normalizes by the level, not the variability, which has two consequences worth checking:</p>
+<p>Within a series with wide dynamic range, low-level time points get weight <span class="arithmatex">\(1/y\)</span> and dominate the average. A series that dips to a tenth of its typical value contributes ten times the sensitivity at those moments, so your score is largely determined by performance in troughs. If the troughs are the hard-to-predict part, every predictor looks similar; if they're the easy part, everything looks good.</p>
+<p>Across series, a variable that is intrinsically volatile relative to its mean will score poorly no matter how good the predictor is, while a near-constant variable scores near 1 for a naïve forecast. Averaging across variables then ranks predictors partly by which variables happen to be easy.</p>
+<p>Alternatives, and what I'd actually suggest
+MASE (Hyndman &amp; Koehler 2006) scales absolute error by the in-sample MAE of a naïve or seasonal-naïve forecast on that same series. This is the standard fix for cross-series comparability and it addresses the weighting problem directly: the normalizer is the series' own scale of variation, so troughs don't get inflated weight and intrinsically volatile series aren't penalized for being volatile. It's also symmetric and consistent for the median. Its main cost is interpretability — 0.8 means "20% better than naïve," not "80% accurate."
+Log accuracy ratio, <span class="arithmatex">\(\log(\hat y/y)\)</span>, summarized by median and median absolute deviation (Morley et al. 2018). Symmetric in ratio, scale-invariant, and cleanly separates bias (median) from spread (MAD). Since <span class="arithmatex">\(1 - |\rho - 1| \approx 1 - |\log \rho|\)</span> near <span class="arithmatex">\(\rho = 1\)</span>, your metric is a linearization of this that inherits its asymmetry from the approximation.
+sMAPE halves the asymmetry by using <span class="arithmatex">\((y+\hat y)/2\)</span> as denominator, but it's not genuinely symmetric and I'd skip it in favor of the above.
+CRPS, or the energy / variogram scores, if your predictors produce distributions. These are proper, so they can't be gamed by hedging. The variogram score is specifically worth knowing for multivariate work because it rewards correct cross-variable dependence — something a per-point metric ignores entirely, along with all temporal structure. If "quality of predictor" includes getting the joint behavior right, no pointwise score will capture it.
+If you want to keep a bounded <span class="arithmatex">\([0,1]\)</span> interpretable score, the minimal repair is still</p>
+<div class="arithmatex">\[S = \frac{\min(y, \hat y)}{\max(y, \hat y)} = e^{-|\log(\hat y/y)|}\]</div>
+<p>Scale-invariant, bounded, equals 1 exactly at <span class="arithmatex">\(\hat y = y\)</span>, symmetric between over- and under-prediction, and never saturates — so 10× off in either direction scores 0.1, and you retain resolution among the bad cases. It's also bounded in influence, keeping the robustness benefit of your clipping without the flat region.</p>
+<p>Whichever you choose, I'd report a bias diagnostic separately — median <span class="arithmatex">\(\log(\hat y / y)\)</span> per variable is cheap and immediately shows whether a predictor is winning by hedging low. A single accuracy number that's biased in a known direction will quietly select for predictors exploiting that direction, and with your current metric that direction is downward.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

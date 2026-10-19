@@ -1,0 +1,2095 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Analyze the accuracy of linear approximations for model kinetics">
+      
+      
+      
+      
+        <link rel="prev" href="../perturbation_study/">
+      
+      
+        <link rel="next" href="../plot_comparison/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Piecewise System Discovery - Linearity Analysis</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#piecewise-system-discovery" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Linearity Analysis" class="md-header__button md-logo" aria-label="Linearity Analysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Linearity Analysis
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Piecewise System Discovery
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../calculating_characteristic_times/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Calculating Characteristic Times
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../calculating_endtime_using_cv/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Calculating Characteristic Using Coefficient of Variation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../change_point_detector/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Change Point Detector
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../evaluation_metrics/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Evaluation Metrics
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../extract_characteristic_times_from_biomodels_papers/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Extracting Characteristic Times from Papers for BioModels
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../find_simulation_end_time/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Find Simulation End Time
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../implementing_piecewise_segmentations/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Piece-wise Linear Approximation for Affine Differential Equations
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../jacobian_estimator/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Jacobian Estimator
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../linear_predictions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Linear Predictions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../model_based_design/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Model-Based Design
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../network_discovery/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Network Discovery
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../perturbation_study/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Perturbation Study
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Piecewise System Discovery
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../plot_comparison/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  plotComparison
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../research_agenda/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Research Agenda
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../score/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Score Class
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../specification/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Specification for Model Linearity Analysis
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../technical_notes/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Technical Notes
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../bugs/segment_scores/" class="md-tabs__link">
+          
+  
+  
+  Bugs
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../references/piecewise_approximatins/" class="md-tabs__link">
+          
+  
+  
+  References
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../superpowers/plans/2026-06-19-piecewise-system-discovery/" class="md-tabs__link">
+          
+  
+  
+  Superpowers
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Linearity Analysis" class="md-nav__button md-logo" aria-label="Linearity Analysis" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Linearity Analysis
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../calculating_characteristic_times/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calculating Characteristic Times
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../calculating_endtime_using_cv/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calculating Characteristic Using Coefficient of Variation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../change_point_detector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change Point Detector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation_metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extract_characteristic_times_from_biomodels_papers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extracting Characteristic Times from Papers for BioModels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../find_simulation_end_time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Find Simulation End Time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementing_piecewise_segmentations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piece-wise Linear Approximation for Affine Differential Equations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jacobian_estimator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jacobian Estimator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../linear_predictions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear Predictions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model_based_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model-Based Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../network_discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../perturbation_study/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perturbation Study
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piecewise System Discovery
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piecewise System Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#motivation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Motivation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class constructor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class constructor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal state
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fit-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit() method
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fit() method">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edge-cases-handled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edge cases handled
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#predict_derivativet-x-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        predict_derivative(t, x) method
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="predict_derivative(t, x) method">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algorithm_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prerequisite-new-systemdiscovery-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisite: new SystemDiscovery method
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#predict-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        predict() method
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="predict() method">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algorithm_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#score-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        score() method
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#printequations-and-__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        printEquations() and __str__()
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plot_comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plotComparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../research_agenda/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research Agenda
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../score/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Score Class
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../specification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specification for Model Linearity Analysis
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../technical_notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Technical Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_19" >
+        
+          
+          <label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bugs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_19_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_19">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Bugs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bugs/segment_scores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Segment Scores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_20" >
+        
+          
+          <label class="md-nav__link" for="__nav_20" id="__nav_20_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_20_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_20">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../references/piecewise_approximatins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piecewise Affine / Piecewise Linear Differential Systems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_21" >
+        
+          
+          <label class="md-nav__link" for="__nav_21" id="__nav_21_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Superpowers
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_21_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_21">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Superpowers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_21_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_21_1" id="__nav_21_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plans
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_21_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_21_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plans
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../superpowers/plans/2026-06-19-piecewise-system-discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Piecewise System Discovery Implementation Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#motivation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Motivation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class constructor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class constructor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#internal-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal state
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fit-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit() method
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fit() method">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edge-cases-handled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edge cases handled
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#predict_derivativet-x-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        predict_derivative(t, x) method
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="predict_derivative(t, x) method">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algorithm_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prerequisite-new-systemdiscovery-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisite: new SystemDiscovery method
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#predict-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        predict() method
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="predict() method">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#algorithm_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#score-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        score() method
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#printequations-and-__str__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        printEquations() and __str__()
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="piecewise-system-discovery">Piecewise System Discovery</h1>
+<p>This documents a class that implements piecewise linear approximations to model systems with time-varying dynamics. Instead of fitting a single global set of ODE coefficients, it detects change points in the time series and fits a separate <code>SystemDiscovery</code> model to each segment, blending predictions across segment boundaries with a Gaussian kernel.</p>
+<h2 id="motivation">Motivation</h2>
+<p>Many biochemical systems exhibit regime shifts (e.g., activation/inactivation of a pathway, saturation effects, or external stimuli). A single linear model may not capture these transitions well. Piecewise approximation allows the model to adapt its coefficients locally while maintaining smooth transitions.</p>
+<h2 id="class-constructor">Class constructor</h2>
+<pre><code class="language-python">class PiecewiseSystemDiscovery(object):
+    def __init__(
+        self,
+        timecourse: Timecourse,
+        num_change_point: int = 2,
+        min_segment_length: int = 100,
+        change_point_threshold: float = 0.1,
+        fit_kernel_bandwidth: float=1.0,
+        predict_kernel_bandwidth: float=1.0,
+        **kwargs,
+    ) -&gt; None:
+</code></pre>
+<h3 id="parameters">Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timecourse</code></td>
+<td><code>Timecourse</code></td>
+<td><em>(required)</em></td>
+<td>Timecourse object.</td>
+</tr>
+<tr>
+<td><code>num_change_point</code></td>
+<td><code>int</code></td>
+<td><code>2</code></td>
+<td>Number of change points.</td>
+</tr>
+<tr>
+<td><code>min_segment_length</code></td>
+<td><code>int</code></td>
+<td><code>100</code></td>
+<td>Minimum number of time points per segment. Candidate change points that would result in segments shorter than this are rejected to ensure stable fits.</td>
+</tr>
+<tr>
+<td><code>change_point_threshold</code></td>
+<td><code>float</code></td>
+<td><code>0.1</code></td>
+<td>Threshold for detecting a changepoint between adjacent entries.</td>
+</tr>
+<tr>
+<td><code>fit_kernel_bandwidth</code></td>
+<td><code>float</code></td>
+<td><code>1.0</code></td>
+<td>Normalizing term for the Gaussian kernel used to smooth the change-point signal (see <code>fit()</code> step 3).</td>
+</tr>
+<tr>
+<td><code>predict_kernel_bandwidth</code></td>
+<td><code>float</code></td>
+<td><code>1.0</code></td>
+<td>Normalizing term for the Gaussian kernel used to blend segment models in <code>predict_derivative()</code>.</td>
+</tr>
+<tr>
+<td><code>**kwargs</code></td>
+<td></td>
+<td></td>
+<td>Forwarded to each per-segment <code>SystemDiscovery(...)</code> constructor (e.g. <code>threshold</code>, <code>poly_degree</code>, <code>bias_species</code>, <code>is_normalize</code>) unmodified — see <code>fit()</code> step 5.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="internal-state">Internal state</h3>
+<p>After <code>fit()</code> is called, the following attributes are available:</p>
+<ul>
+<li><code>self._segment_models: list[SystemDiscovery]</code> — One fitted <code>SystemDiscovery</code> per segment. There are n+1 segments if there are n change points. Each is fit on its own raw (unscaled) data slice; <code>SystemDiscovery</code>'s own per-segment <code>Scaler</code> (default <code>is_normalize=True</code>) normalizes for fitting and denormalizes its output back to physical units, so each segment's coefficients and derivatives are self-consistently in physical units.</li>
+<li><code>self._segment_boundaries: list[tuple[float, float]]</code> — <code>(start_time, end_time)</code> for each segment.</li>
+</ul>
+<p><strong>Note on a prior design (corrected):</strong> an earlier version of this design scaled the entire timecourse once with a single global <code>Scaler</code>, sliced the <em>scaled</em> DataFrame per segment, and forced <code>is_normalize=False</code> on every segment model (reasoning: the data was "already normalized," so segments shouldn't re-normalize). That is a real bug, not a stylistic choice: <code>is_normalize=False</code> makes <code>SystemDiscovery</code> treat its input as final physical units and never denormalize its output. Since the input was actually pre-scaled by <code>x / s_i</code> per species, every cross-species coefficient came out inflated by the ratio <code>s_i/s_j</code> of the two species' global standard deviations (self-coefficients were unaffected, since the scaling cancels on the diagonal — confirmed numerically: a 2-species fixture with global <code>std(S1)/std(S2) = 2.823</code> produced cross-term coefficients inflated by <code>2.824</code>, while self-decay terms fit exactly). <code>predict_derivative()</code>/<code>predict()</code> then integrated these still-scaled derivatives directly against true physical-unit states, corrupting every prediction. There is no global <code>self._scaler</code> in the corrected design — nothing else in this design needs one.</p>
+<h2 id="fit-method"><code>fit()</code> method</h2>
+<pre><code class="language-python">def fit(self) -&gt; &quot;PiecewiseSystemDiscovery&quot;
+</code></pre>
+<p>Returns <code>self</code>, matching <code>SystemDiscovery.fit()</code>'s chaining convention.</p>
+<h3 id="algorithm">Algorithm</h3>
+<ol>
+<li>
+<p><strong>Create normalized Jacobians</strong>: Using the raw Jacobians from the timecourse, let <span class="arithmatex">\({\bf A} = {a_{ij}}\)</span>. The entry is normalized to account for the magnitudes of the column state variable, <span class="arithmatex">\(x_j\)</span>, and the row state variable, <span class="arithmatex">\(x_i\)</span>. Let <span class="arithmatex">\(s_i, s_j\)</span> be the standard deviations of these state variables over their full timecourse. Then, <span class="arithmatex">\(a_{ij} \rightarrow a_{ij} \frac{s_j}{s_i}\)</span>. This normalization exists solely to make Jacobian entries comparable for change-point detection — it is local to this step and has no bearing on how segment models are later fit.</p>
+</li>
+<li>
+<p><strong>Compute change-point signal</strong>: Calculate the Frobenius distance between time-adjacent normalized Jacobians and divide this by <span class="arithmatex">\(n^2\)</span>, where <span class="arithmatex">\(n\)</span> is the number of state variables (chemical species). Then smooth these differences over time using a Gaussian kernel with bandwidth <code>fit_kernel_bandwidth</code>. (<code>predict_kernel_bandwidth</code> is not used here — it applies only to <code>predict_derivative()</code>.) The result is one signal value per time point (the first time point has no signal, since it has no predecessor).</p>
+</li>
+<li>
+<p><strong>Detect change points</strong>: Sort all candidate time points by signal value, descending. Maintain an initially-empty list of accepted change-point times, kept sorted by time. Walk the sorted candidates in descending-signal order:</p>
+</li>
+<li>If the candidate's signal &lt; <code>change_point_threshold</code>, stop (all remaining candidates have smaller or equal signal).</li>
+<li>Determine where the candidate's time would be inserted into the accepted list (by time, not by signal rank). Check the lengths (in time points) of the two segments this would create — bounded by the candidate's time-adjacent neighbors among the already-accepted points, or by the timecourse start/end if there are no neighbors on that side. If either resulting segment would be shorter than <code>min_segment_length</code>, reject the candidate and continue to the next.</li>
+<li>Otherwise, insert the candidate into the accepted list (in time order).</li>
+<li>If the accepted list has reached <code>num_change_point</code> entries, stop.</li>
+<li>Otherwise continue to the next candidate.</li>
+</ol>
+<p>The final change points are the accepted list, in time order. No merging is performed — a candidate that doesn't fit is simply skipped, never combined with a neighbor.</p>
+<ol>
+<li><strong>Fit per-segment models</strong>: For each segment defined by the accepted change points:</li>
+<li>Slice the <strong>raw</strong> (unscaled) timecourse DataFrame to the segment's <code>[start_time, end_time)</code> (a plain <code>DataFrame.loc[...]</code> slice — <code>Timecourse</code> has no <code>makeSubmodel()</code> equivalent to <code>Trajectory.makeSubmodel()</code>).</li>
+<li>Construct <code>SystemDiscovery(segment_df, **kwargs)</code>, passing <code>kwargs</code> through unmodified. <code>SystemDiscovery</code>'s own default (<code>is_normalize=True</code>) applies unless the caller explicitly overrides it via <code>kwargs</code>; each segment normalizes using its own local statistics and denormalizes its own output, so coefficients and derivatives come out in physical units without any cross-segment scale dependency.</li>
+</ol>
+<h3 id="edge-cases-handled">Edge cases handled</h3>
+<ul>
+<li><strong>0 change points detected</strong>: If no change point is accepted, use the entire timecourse as a single segment.</li>
+<li><strong>All segments too short</strong>: If every candidate is rejected for violating <code>min_segment_length</code> (so 0 change points survive step 4), this is handled by the same path as the previous bullet — use the entire timecourse as a single segment.</li>
+</ul>
+<h2 id="predict_derivativet-x-method"><code>predict_derivative(t, x)</code> method</h2>
+<pre><code class="language-python">def predict_derivative(self, t: float, x: np.ndarray) -&gt; np.ndarray
+</code></pre>
+<p>This is a method of the <code>PiecewiseSystemDiscovery</code> class. It predicts <span class="arithmatex">\(\frac{d{\bf x}(t)}{dt}\)</span> given the current state <span class="arithmatex">\({\bf x}(t)\)</span> at time <span class="arithmatex">\(t\)</span>, blending across all fitted segment models. Returns a denormalized (physical-units) derivative.</p>
+<h3 id="algorithm_1">Algorithm</h3>
+<ol>
+<li>Compute a Gaussian weight for each segment model based on the distance from <code>t</code> to the segment's midpoint:</li>
+</ol>
+<p><code>text
+   w_i = exp( -0.5 * (t - midpoint_i)^2 / sigma^2 )</code></p>
+<p>where <code>sigma</code> is <code>predict_kernel_bandwidth</code> and <code>midpoint_i</code> is the mean of <code>self._segment_boundaries[i]</code>.
+2. For each segment model <code>i</code>, obtain its one-step derivative at <code>x</code>:</p>
+<p><code>text
+   dx_dt_i = segment_model_i.predictOneStepDerivative(x)</code></p>
+<ol>
+<li>Blend: <code>dx_dt = sum(w_i * dx_dt_i) / sum(w_i)</code>.</li>
+<li>Return <code>dx_dt</code>.</li>
+</ol>
+<h3 id="prerequisite-new-systemdiscovery-method">Prerequisite: new <code>SystemDiscovery</code> method</h3>
+<p><code>SystemDiscovery</code> currently has no public, non-integrating, single-state derivative evaluator — only <code>predict(test_df)</code>, which integrates over a full time grid. Step 2 above requires adding a small public method to <code>SystemDiscovery</code>, e.g.:</p>
+<pre><code class="language-python">def predictOneStepDerivative(self, x: np.ndarray) -&gt; np.ndarray:
+    &quot;&quot;&quot;Evaluate the fitted ODE's right-hand side at a single state x (no integration).&quot;&quot;&quot;
+    self._require_fitted()
+    z = self._normalizer.normalize(x)
+    dz_dt = self.model.predict(z.reshape(1, -1))[0]
+    return self._normalizer.denormalize(dz_dt)
+</code></pre>
+<p>This factors out the <code>rhs</code> closure already used internally by <code>SystemDiscovery._simulate()</code> (<code>src/system_discovery.py:864-868</code>), without changing <code>_simulate</code>'s behavior. This is a prerequisite change outside the scope of <code>PiecewiseSystemDiscovery</code> itself, called out here so it isn't missed during implementation.</p>
+<p>(Note: segment models default to <code>is_normalize=True</code> — each segment's own <code>normalize</code>/<code>denormalize</code> round-trip is what keeps its coefficients and derivatives in physical units. <code>predictOneStepDerivative</code> is written generically, matching <code>_simulate</code>'s existing pattern, so it works correctly whether or not a given segment model normalizes.)</p>
+<h2 id="predict-method"><code>predict()</code> method</h2>
+<pre><code class="language-python">def predict(self, test_df: pd.DataFrame = NULL_DF) -&gt; pd.DataFrame:
+</code></pre>
+<h3 id="algorithm_2">Algorithm</h3>
+<ol>
+<li>
+<p>Determine the initial condition and time grid: If <code>test_df</code> is provided, use <code>test_df.values[0]</code> as <code>x0</code> and <code>test_df.index</code> as the time grid. Otherwise, use the training initial condition and the training time grid.</p>
+</li>
+<li>
+<p>Integrate forward in a single continuous solve from <code>x0</code> over the full time grid, using <code>self.predict_derivative</code> as the right-hand side (analogous to <code>SystemDiscovery._simulate</code>'s use of <code>solve_ivp</code>, e.g. <code>solve_ivp(fun=self.predict_derivative, t_span=(t[0], t[-1]), y0=x0, t_eval=t, ...)</code>). The state passed into <code>predict_derivative</code> at each evaluation is the integrator's current (predicted) state — there is no periodic restart from the observed trajectory, unlike <code>LinearPredictor</code>'s windowed integration. This is a deliberate difference: continuous integration lets the Gaussian blending in <code>predict_derivative</code> produce smooth transitions across segment boundaries, which a restart-every-<code>num_step</code> scheme would interrupt.</p>
+</li>
+<li>
+<p>Return a <code>pd.DataFrame</code> with the predicted trajectories, same format as <code>SystemDiscovery.predict()</code>.</p>
+</li>
+</ol>
+<h3 id="notes">Notes</h3>
+<ul>
+<li>The Gaussian kernel ensures smooth transitions: segments whose time range is far from <code>t</code> contribute weights that approach (but never exactly reach) zero. There is no separate discrete rule for out-of-range extrapolation — when <code>test_df</code>'s time range falls outside the training range, the nearest segment's weight simply dominates the (still continuous) blend as long as <code>predict_kernel_bandwidth</code> is small relative to the extrapolation distance.</li>
+</ul>
+<h2 id="score-method"><code>score()</code> method</h2>
+<pre><code class="language-python">def score(self) -&gt; ScoreInfo:
+</code></pre>
+<p>Returns a <code>ScoreInfo</code> object (the <code>system_discovery.ScoreInfo</code> dataclass: <code>min</code>, <code>median</code>, <code>max</code>, <code>values</code>, <code>num_nonzero_term</code>) with R² statistics aggregated across all segments, weighted by segment length (number of time points). The <span class="arithmatex">\(R^2\)</span> is computed on the estimates of the derivatives compared with their true values.</p>
+<ul>
+<li>For each segment, compute the <span class="arithmatex">\(R^2\)</span> values (one per species) using the parent method (<code>SystemDiscovery.score()</code>) on the segment's own data.</li>
+<li>Weighted aggregation:
+  <code>weighted_values = concat([segment.score().values repeated segment_length times for each segment])</code>
+  <code>min</code>, <code>median</code>, and <code>max</code> are then computed from <code>weighted_values</code>.</li>
+<li><code>num_nonzero_term</code> is the sum of <code>segment.score().num_nonzero_term</code> across all segments. Note this is a simple sum, not deduplicated by species — a term appearing in multiple segments' equations is counted once per segment.</li>
+<li>Raises <code>RuntimeError</code> if called before <code>fit()</code>, matching <code>SystemDiscovery</code>'s <code>_require_fitted()</code> convention (likewise for <code>predict()</code> and <code>printEquations()</code>).</li>
+</ul>
+<h2 id="printequations-and-__str__"><code>printEquations()</code> and <code>__str__()</code></h2>
+<p>Prints the discovered ODE for each segment, prefixed with the segment's time range:</p>
+<pre><code>[Segment 1: t in [0.0, 12.5)]
+  dA/dt = -0.342 * A + 0.018
+  dB/dt = 0.342 * A - 0.115 * B
+
+[Segment 2: t in [12.5, 25.0)]
+  dA/dt = -0.521 * A + 0.032
+  dB/dt = 0.521 * A - 0.203 * B + 0.041 * A * B
+</code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "content.code.copy", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

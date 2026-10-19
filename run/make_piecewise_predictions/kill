@@ -1,0 +1,3 @@
+#! /bin/bash
+# Kills all running processes for this task
+ps aux | grep piecewise | awk '{print $2}' | xargs kill -9
