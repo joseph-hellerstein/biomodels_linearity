@@ -81,12 +81,12 @@ class TimecourseIterator:
             raise ValueError(f"Unsupported num_point {num_point}. Use 1000, 10000, or 100000.")
 
     @classmethod
-    def getTimecourse(cls, model_name: Union[str, int],
+    def getTimecourse(cls, model_id: Union[str, int],
             zip_path: str = cn.TIMECOURSE_ZIP_PATH, num_point: Optional[int]=None) -> Timecourse:
         """Return the deserialized Timecourse for *model_name* from the zip.
 
         Args:
-            model_name (str | int): BioModels identifier (e.g. 'BIOMD0000000001') or model number (e.g. 1).
+            model_id (str | int): BioModels identifier (e.g. 'BIOMD0000000001') or model number (e.g. 1).
             zip_path (str, optional): Path to the zip file containing serialized Timecourses.
                 Defaults to ``cn.TIMECOURSE_ZIP_PATH``.
             num_point: int: Number of points used to select the zippath
@@ -107,11 +107,10 @@ class TimecourseIterator:
         if not os.path.isfile(zip_path):
             raise FileNotFoundError(
                 f"Zip file not found: {zip_path}. "
-                f"Use Timecourse.makeBiomodelDF({model_name!r}) to generate on demand.")
+                f"Use Timecourse.makeBiomodelDF({model_id!r}) to generate on demand.")
 
         iterator = TimecourseIterator()
-        if isinstance(model_name, int):
-            model_name = Model.getBiomodelName(model_name)
+        model_name = Model.getModelNumberAndName(model_id)[1]
         entry_name = f"{model_name}_timecourse.pkl"
         with zipfile.ZipFile(zip_path, 'r') as zf:
             with zf.open(entry_name) as entry_f:

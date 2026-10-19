@@ -1,7 +1,11 @@
+# TO DO
+
+# Analyses
+1. Consistency of changepoint and AUC across replications
+2. Relate AUC to accuracy, like distribution of AUC for large accuracies.
+
 # Tasks
-0. NLCurve
-   1. Bug in merge of curves. Index must be scaled by the maximum boundary. Redo algorithm to: (a) find new boundaries as the union of the old boundaries; (b) construct segments; (c) properly assign fractional areas.
-1. 1.1 getPSDPredctionDF uses a pickle cache.
+1. Validate predictions with bestchangepoint
 2. PiecewiseAnalyzer
    1. Plot CDF frac changepoints for man max_fractional_reduction (MFR)
    2. Plot a single model with changepoints for different MFR

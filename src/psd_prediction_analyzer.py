@@ -3,6 +3,8 @@
 import src.constants as cn  # type: ignore
 from src.psd_prediction_file_iterator import PSDPredictionFileIterator  # type: ignore
 from src.model import Model  # type: ignore
+from src.piecewise_system_discovery import PiecewiseSystemDiscovery  # type: ignore
+from src.timecourse_iterator import TimecourseIterator  # type: ignore
 
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
@@ -89,6 +91,21 @@ class PSDPredictionAnalyzer:
         ser = self.model_df.loc[best_idx]  # type: ignore[assignment]
         return ser
 
+    def makeBestPSD(self) -> PiecewiseSystemDiscovery:
+        """Creates a Model object for the best PSD prediction.
+
+        Returns:
+            Model: A Model object representing the best PSD prediction.
+        """
+        df = TimecourseIterator.getTimecourse(self.model_name).timecourse_df
+        if self.best_model_ser is None:
+            raise ValueError(f"No valid PSD predictions found for model {self.model_name} with min_accuracy {self.min_accuracy}.")
+        psd = PiecewiseSystemDiscovery(df, 
+                changepoints=self.best_model_ser.changepoints,
+                is_changepoint_removal=False,
+                model_name=self.model_name)
+        psd.fit()
+        return psd
 
     def analyzeAUCConsistency(self) -> pd.DataFrame:
         """Analyze the consistency of the AUC (Area Under the Curve) for a given system.

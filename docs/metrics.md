@@ -51,3 +51,17 @@ So, $\alpha^{\prime} > \alpha$.
 ### Bounds on AUC
 
 Given $M$ segments that sum to $T$, we can construct a lower and upper bound for $\alpha$.
+
+For the upper bound, $s_i = \frac{1}{M}$ and so 
+$$
+\alpha_H = M \frac{1}{M} (1 - \frac{1}{M}) = \frac{M-1}{M}
+$$
+Clearly, $lim_{M \rightarrow \infty} \alpha_H =1$.
+
+For the lower bound, let $s^*$ be the size of the smallest segment permitted for the simulation data.
+We assume that as $M \rightarrow \infty$, $s^*, M s^* \rightarrow 0$. Our configuration of the segments is that
+there are $M-1$ segments of size $s^*$, and one segment of size $1 - (M-1)s^*$. For large $M$,
+$$
+lim_{M \rightarrow \infty} \alpha_L = (M -1) s^* (1 - s^*) + (1 - (M -1) s^*)(M -1) s^*
+= 0
+$$
