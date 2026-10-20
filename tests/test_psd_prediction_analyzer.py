@@ -3,16 +3,27 @@
 import os
 import pickle
 import tempfile
+import types
 import unittest
 from typing import Optional, cast, Any
+from unittest.mock import patch
 
+import matplotlib  # noqa: F401 -- non-interactive backend needed before pyplot
+matplotlib.use("Agg")
+
+import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
+from scipy.integrate import solve_ivp  # type: ignore
 
 import src.constants as cn  # type: ignore
+from src.piecewise_system_discovery import (  # type: ignore
+    PiecewiseSystemDiscovery,
+)
 from src.psd_prediction_analyzer import (  # type: ignore
     DEFAULT_MAX_CHANGEPOINT,
     PSDPredictionAnalyzer,
 )
+from src.timecourse_iterator import TimecourseIterator  # type: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -32,8 +43,11 @@ def _row(
     a80: float = 0.85,
     a90: float = 0.75,
     a95: float = 0.65,
+    changepoints: Optional[list] = None,
 ) -> dict:
-    """Return a dict with every column required by analyzeAUCConsistency."""
+    """Return a dict with every column required by the PSDPredictionAnalyzer tests."""
+    if changepoints is None:
+        changepoints = [50]
     return {
         cn.COL_SYSTEM_ID: system_id,
         cn.COL_AGGREGATION_TYPE: aggregation_type,
@@ -46,7 +60,20 @@ def _row(
         cn.COL_A80: a80,
         cn.COL_A90: a90,
         cn.COL_A95: a95,
+        cn.COL_CHANGEPOINTS: changepoints,
     }
+
+
+def _make_timecourse_df(n_points: int = 100) -> pd.DataFrame:
+    """Generate a small linear ODE timecourse for testing (same dynamics as
+    test_piecewise_system_discovery._make_linear_df)."""
+    def rhs(t, z):
+        a, b = z
+        return [-0.5 * a + 0.1 * b, 0.3 * a - 0.2 * b]
+
+    t_eval = np.linspace(0.0, 10.0, n_points)
+    sol = solve_ivp(rhs, [0.0, 10.0], [1.0, 0.0], t_eval=t_eval, rtol=1e-8)
+    return pd.DataFrame(sol.y.T, index=t_eval, columns=["A", "B"])
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +173,108 @@ class TestGetModelBestSer(unittest.TestCase):
                 model_id=5, data_dir=tmpdir, is_guard_filename=False,  # type: ignore
             )
         self.assertAlmostEqual(analyzer.best_model_ser[cn.COL_AUC], 0.9)  # type: ignore
+
+
+# ---------------------------------------------------------------------------
+# makeBestPSD
+# ---------------------------------------------------------------------------
+
+
+class TestMakeBestPSD(unittest.TestCase):
+    """Unit tests for makeBestPSD.
+
+    TimecourseIterator.getTimecourse is mocked (it reads from a zip archive);
+    the PiecewiseSystemDiscovery fit runs for real on a small synthetic timecourse.
+    """
+
+    def setUp(self) -> None:
+        self._tmpdir = tempfile.TemporaryDirectory()  # type: ignore
+        self._df = _make_timecourse_df(n_points=100)
+        patcher = patch.object(
+            TimecourseIterator, "getTimecourse",
+            return_value=types.SimpleNamespace(timecourse_df=self._df),
+        )
+        self._mock_get_timecourse = patcher.start()  # type: ignore
+        self.addCleanup(patcher.stop)
+
+    def tearDown(self) -> None:
+        self._tmpdir.cleanup()
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+
+    def _write_pkl(self, df: pd.DataFrame) -> None:
+        """Write df as a pickle file inside the temp directory."""
+        path = os.path.join(self._tmpdir.name, "piecewise_predictions__numpoint_100000__threshold_0.001__removal_0__manycp_1.pkl")
+        with open(path, "wb") as f:
+            pickle.dump(df, f)
+
+    def _make_analyzer(self) -> PSDPredictionAnalyzer:
+        return PSDPredictionAnalyzer(model_id=5, data_dir=self._tmpdir.name,  # type: ignore
+                is_guard_filename=False)
+
+    def _make_best_psd(self, **row_override) -> PiecewiseSystemDiscovery:
+        """Write a single-row pickle (default values overridden by kwargs) and run makeBestPSD."""
+        self._write_pkl(pd.DataFrame([{**_row(), **row_override}]))
+        return self._make_analyzer().makeBestPSD()
+
+    # ------------------------------------------------------------------
+    # happy path
+    # ------------------------------------------------------------------
+
+    def test_returns_fitted_piecewise_system_discovery(self) -> None:
+        psd = self._make_best_psd()
+        self.assertIsInstance(psd, PiecewiseSystemDiscovery)
+        # num_changepoint is 0 when not fitted; one changepoint -> two segments.
+        self.assertEqual(psd.num_changepoint, 1)
+
+    def test_uses_best_row_changepoints(self) -> None:
+        psd = self._make_best_psd(changepoints=[50])
+        self.assertEqual(psd.changepoints, [50])
+
+    def test_training_df_is_timecourse_from_iterator(self) -> None:
+        psd = self._make_best_psd()
+        pd.testing.assert_frame_equal(psd.training_df, self._df)
+
+    def test_model_name_set_on_psd(self) -> None:
+        psd = self._make_best_psd()
+        self.assertEqual(psd.model_name, "BIOMD0000000005")
+
+    def test_get_timecourse_called_with_model_name(self) -> None:
+        self._make_best_psd()
+        self._mock_get_timecourse.assert_called_once_with("BIOMD0000000005")  # type: ignore
+
+    def test_selects_min_auc_row_changepoints(self) -> None:
+        """With two qualifying rows, the changepoints of the min-AUC row are used."""
+        df = pd.DataFrame([
+            _row(auc=0.9, changepoints=[30]),
+            _row(auc=0.2, changepoints=[70]),
+        ])
+        self._write_pkl(df)
+        psd = self._make_analyzer().makeBestPSD()
+        self.assertEqual(psd.changepoints, [70])
+
+    def test_empty_changepoints_yields_single_segment(self) -> None:
+        psd = self._make_best_psd(changepoints=[])
+        # boundaries raises RuntimeError when not fitted, so this also proves the fit ran.
+        self.assertEqual(psd.boundaries, [0, 99])
+
+    # ------------------------------------------------------------------
+    # error paths
+    # ------------------------------------------------------------------
+
+    def test_raises_value_error_when_no_valid_predictions(self) -> None:
+        """Rows below min_accuracy are excluded; with none left, makeBestPSD raises."""
+        self._write_pkl(pd.DataFrame([_row(mean=0.1)]))  # mean=0.1 < default min_accuracy=0.8
+        with self.assertRaises(ValueError):
+            self._make_analyzer().makeBestPSD()
+
+    def test_raises_value_error_when_no_rows_for_model(self) -> None:
+        """Rows for a different system_id leave best_model_ser empty; makeBestPSD raises."""
+        self._write_pkl(pd.DataFrame([_row(system_id="WRONG_ID")]))
+        with self.assertRaises(ValueError):
+            self._make_analyzer().makeBestPSD()
 
 
 # ---------------------------------------------------------------------------
@@ -469,6 +598,131 @@ class TestAnalyzeAUCConsistencyEndToEndBiomd278(unittest.TestCase):
         """BIOMD0000000278 has a single qualifying row with AUC=0.0 which gets replaced by NaN."""
         result = self._run()
         self.assertTrue(pd.isna(result.loc[1e-8, (cn.COL_AUC, cn.COL_MEAN)]))  # type: ignore
+
+
+# ---------------------------------------------------------------------------
+# plotBestLinearFits
+# ---------------------------------------------------------------------------
+
+
+class TestPlotBestLinearFits(unittest.TestCase):
+    """Unit tests for the plotBestLinearFits classmethod.
+
+    TimecourseIterator.getTimecourse is mocked (it reads from a zip archive).
+    plotPiecewise either runs for real on the small synthetic timecourse or is
+    patched to record calls.
+    """
+
+    def setUp(self) -> None:
+        self._tmpdir = tempfile.TemporaryDirectory()  # type: ignore
+        self._df = _make_timecourse_df(n_points=100)
+        patcher = patch.object(
+            TimecourseIterator, "getTimecourse",
+            return_value=types.SimpleNamespace(timecourse_df=self._df),
+        )
+        self._mock_get_timecourse = patcher.start()  # type: ignore
+        self.addCleanup(patcher.stop)
+        # Qualifying rows for two models with distinct changepoints.
+        self._write_pkl(pd.DataFrame([
+            _row(system_id="BIOMD0000000005", changepoints=[40]),
+            _row(system_id="BIOMD0000000010", changepoints=[60]),
+        ]))
+
+    def tearDown(self) -> None:
+        self._tmpdir.cleanup()
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+
+    def _write_pkl(self, df: pd.DataFrame) -> None:
+        """Write df as a pickle file inside the temp directory."""
+        path = os.path.join(self._tmpdir.name, "piecewise_predictions__numpoint_100000__threshold_0.001__removal_0__manycp_1.pkl")
+        with open(path, "wb") as f:
+            pickle.dump(df, f)
+
+    def _run(self, model_ids: list, **kwargs) -> None:
+        return PSDPredictionAnalyzer.plotBestLinearFits(  # type: ignore
+            model_ids, data_dir=self._tmpdir.name, **kwargs)
+
+    # ------------------------------------------------------------------
+    # happy path (real plotPiecewise on the small synthetic timecourse)
+    # ------------------------------------------------------------------
+
+    def test_returns_none(self) -> None:
+        self.assertIsNone(self._run([5]))
+
+    # ------------------------------------------------------------------
+    # per-model dispatch (plotPiecewise patched to record calls)
+    # ------------------------------------------------------------------
+
+    def _record_plots(self) -> tuple:
+        """Return a (plotted, patcher) pair; starting the patcher replaces plotPiecewise
+        with a plain function that records each PSD instance it is called on."""
+        plotted: list = []
+
+        def _record(self_psd: PiecewiseSystemDiscovery, *args, **kwargs) -> None:
+            plotted.append(self_psd)
+
+        return plotted, patch.object(PiecewiseSystemDiscovery, "plotPiecewise", _record)
+
+    def test_plots_each_model_in_list(self) -> None:
+        plotted, patcher = self._record_plots()
+        with patcher:
+            self._run([5, 10])
+        self.assertEqual(sorted(p.model_name for p in plotted), ["BIOMD0000000005", "BIOMD0000000010"])
+
+    def test_uses_each_models_own_best_changepoints(self) -> None:
+        plotted, patcher = self._record_plots()
+        with patcher:
+            self._run([5, 10])
+        by_name = {p.model_name: p.changepoints for p in plotted}
+        self.assertEqual(by_name["BIOMD0000000005"], [40])
+        self.assertEqual(by_name["BIOMD0000000010"], [60])
+
+    def test_plot_piecewise_called_with_expected_kwargs(self) -> None:
+        with patch.object(PiecewiseSystemDiscovery, "plotPiecewise") as mock_plot:  # type: ignore
+            self._run([5])
+        for call in mock_plot.call_args_list:  # type: ignore
+            self.assertEqual(call.kwargs, {
+                "is_changepoint_plot": True,
+                "legend": False,
+                "num_true_point": 60,
+                "is_nochangepoint_plot": False,
+            })
+
+    # ------------------------------------------------------------------
+    # parameter forwarding / error paths
+    # ------------------------------------------------------------------
+
+    def test_forwards_min_accuracy(self) -> None:
+        """A row that qualifies at the default 0.8 but not at 0.9 must raise."""
+        self._write_pkl(pd.DataFrame([_row(mean=0.85)]))  # qualifies at 0.8, not at 0.9
+        with self.assertRaises(ValueError):
+            self._run([5], min_accuracy=0.9)
+
+    def test_forwards_data_dir(self) -> None:
+        """An empty data_dir has no predictions, so makeBestPSD must raise."""
+        with tempfile.TemporaryDirectory() as empty_dir:  # type: ignore
+            with self.assertRaises(ValueError):
+                PSDPredictionAnalyzer.plotBestLinearFits(  # type: ignore
+                    [5], data_dir=empty_dir)
+
+    def test_raises_value_error_when_no_valid_predictions(self) -> None:
+        self._write_pkl(pd.DataFrame([_row(mean=0.1)]))  # mean=0.1 < default min_accuracy=0.8
+        with self.assertRaises(ValueError):
+            self._run([5])
+
+    def test_error_on_first_model_prevents_later_plots(self) -> None:
+        """A failing model aborts the loop before later models are plotted."""
+        self._write_pkl(pd.DataFrame([
+            _row(system_id="BIOMD0000000005", mean=0.1),  # does not qualify
+            _row(system_id="BIOMD0000000010", changepoints=[60]),  # qualifies
+        ]))
+        with patch.object(PiecewiseSystemDiscovery, "plotPiecewise") as mock_plot:  # type: ignore
+            with self.assertRaises(ValueError):
+                self._run([5, 10])
+        mock_plot.assert_not_called()  # type: ignore
 
 
 if __name__ == "__main__":

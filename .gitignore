@@ -8,9 +8,12 @@ __pycache__/
 archive/*
 data/serialize/*
 data/*
-paper/*.pdf
-score.csv
-data/*.zip
+*/score.csv
+*.zip
+*.pdf
+*.zip
+*.csv
+*.png
 data/_*.py
 tests/_*.py
 *.pkl

@@ -129,6 +129,7 @@ class SystemDiscovery:
     def __init__(
         self,
         training_df: pd.DataFrame,
+        model_id: Optional[Union[str, int]] = None,
         coefficient_threshold: float = 0.01,
         alpha: float = 0.05,
         differentiation: Union[Literal["smooth"], Literal["finite"], Literal["spectral"]] = "smooth",
@@ -138,6 +139,7 @@ class SystemDiscovery:
         bias_species: Union[list[str], None] = None,
         is_normalize: bool = True,
     ) -> None:
+        self.model_id = model_id
         self.training_df = training_df
         self.coefficient_threshold = coefficient_threshold
         self.alpha = alpha
@@ -195,14 +197,22 @@ class SystemDiscovery:
 
         # Set the window size small enough to accommodate the data
         window_length = training_df.shape[0] - 1
-        if window_length < 2:
+        if window_length < 1:
             raise ValueError("Window length is too small to perform differentiation.")
-        sfd = SmoothedFiniteDifference(smoother_kws={'window_length': window_length, 'polyorder': 2})
-        self.model: ps.SINDy = ps.SINDy(
-            feature_library=library,
-            optimizer=optimizer,
-            differentiation_method=sfd,
-        )
+        polyorder = 2
+        if window_length < polyorder:
+            differentiation_method = ps.FiniteDifference()
+        else:
+            differentiation_method = SmoothedFiniteDifference(smoother_kws=
+                    {'window_length': window_length, 'polyorder': 2})
+        try:
+            self.model: ps.SINDy = ps.SINDy(
+                feature_library=library,
+                optimizer=optimizer,
+                differentiation_method=differentiation_method,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to initialize PySINDy model: {exc}") from exc
         self.is_fitted: bool = False
 
     def __str__(self) -> str:

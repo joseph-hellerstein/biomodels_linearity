@@ -21,8 +21,7 @@ from dataclasses import dataclass  # noqa: E402 (dataclass used by PiecewiseSyst
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
-from typing import Any, Dict, List, Optional, Tuple
-from typing import cast
+from typing import Any, List, Optional, Tuple, cast, Union
 
 
 PlotBiomodelsSignalResult = collections.namedtuple('PlotBiomodelsSignalResult',
@@ -50,7 +49,7 @@ class PiecewiseSystemDiscovery(object):
         training_df:  pd.DataFrame,
         max_changepoint: int = 2,
         max_fractional_reduction: float = 0.01,  
-        model_name: str = "",
+        model_id: Optional[Union[str, int]] =None, 
         changepoints: Optional[List[int]] = None,
         is_changepoint_removal: bool = True,
         is_changepoints_from_file: bool = False,
@@ -63,7 +62,7 @@ class PiecewiseSystemDiscovery(object):
             max_changepoint (int, optional): Maximum number of change points to detect. Defaults to 2.
                 Can be adjusted so that there is enough data per segment.
             max_fractional_reduction (float, optional): Maximum fractional reduction in the sum of squared errors required to accept a new change point. Defaults to 0.01.
-            model_name (str, optional): Optional name tag used in plots and error messages. Defaults to "".
+            model_id (str, int optional): Optional ID tag used in plots and error messages. Defaults to "".
             changepoints (List[int], optional): List of pre-determined change points. Defaults to None.
             is_changepoint_removal (bool, optional): Whether to allow removal of detected change points. Defaults to True.
             is_changepoints_from_file (bool, optional): Whether to load change points from a CSV file. Defaults to False.
@@ -73,7 +72,11 @@ class PiecewiseSystemDiscovery(object):
         self.species_names = list(training_df.columns)
         self.num_species = len(self.species_names)
         self.num_point = training_df.shape[0]
-        self.model_name = model_name
+        if model_id is None:
+            self.model_name = ""
+            self.model_num = -1
+        else:
+            self.model_num, self.model_name = Model.getModelNumberAndName(model_id)
         self.max_changepoint = max_changepoint
         self.max_fractional_reduction = max_fractional_reduction
         sd_kwargs["poly_degree"] = sd_kwargs.get("poly_degree", 1)
@@ -227,10 +230,14 @@ class PiecewiseSystemDiscovery(object):
             boundaries.append((float(time_arr[lo]), float(end_time)))
             lengths.append(hi - lo)
             try:
-                sys_disc = SystemDiscovery(subsequence_df, **self._sd_kwargs).fit()
-                models.append(sys_disc)
+                sys_disc = SystemDiscovery(subsequence_df, **self._sd_kwargs)
             except Exception as e:
                 raise RuntimeError(f"Error fitting SystemDiscovery for segment {lo}:{hi}: {e}")
+            try:
+                sys_disc = sys_disc.fit()  # type: ignore
+                models.append(sys_disc)
+            except Exception as e:
+                raise RuntimeError(f"Error re-fitting SystemDiscovery for segment {lo}:{hi}: {e}")
         return models, boundaries, lengths
 
     def _makeChangepointsWithoutElimination(self) -> List[int]:

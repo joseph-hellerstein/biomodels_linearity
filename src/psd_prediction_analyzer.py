@@ -11,13 +11,15 @@ import pandas as pd  # type: ignore
 from typing import Union
 
 DEFAULT_MAX_CHANGEPOINT = 5000
+DEFAULT_MIN_ACCURACY = 0.8
+DEFAULT_ACCURACY_STATISTIC = cn.COL_MEAN
 
 
 class PSDPredictionAnalyzer:
 
     def __init__(self, model_id: Union[str, int],
-            min_accuracy : float = 0.8,
-            accuracy_statistic: str = cn.COL_MEAN,
+            min_accuracy : float = DEFAULT_MIN_ACCURACY,
+            accuracy_statistic: str = DEFAULT_ACCURACY_STATISTIC,
             is_guard_filename: bool = True,
             data_dir: str = cn.PSD_DATA_DIR) -> None:
         """Construct a PSDPredictionAnalyzer object.
@@ -47,16 +49,10 @@ class PSDPredictionAnalyzer:
         Returns:
             pd.DataFrame: A filtered DataFrame.
         """
-        filtered_columns = [cn.COL_SYSTEM_ID, cn.COL_AUC, cn.COL_P50, cn.COL_NUM_CHANGEPOINT,
-                cn.COL_MAX_CHANGEPOINT, cn.COL_MAX_FRACTIONAL_REDUCTION,
-                cn.COL_AGGREGATION_TYPE,
-                cn.COL_MEAN,  # needed by _getModelBestSer for accuracy filtering
-            ] + list(cn.COLUMN_ACCURACY_FRACTIONS)
         try:
             mask = df[cn.COL_AGGREGATION_TYPE] == cn.COL_AGGREGATION_TYPE_MODEL
             mask &= df[cn.COL_MAX_CHANGEPOINT] == DEFAULT_MAX_CHANGEPOINT
             mask &= df[cn.COL_SYSTEM_ID] == self.model_name
-            #result_df = df[mask][filtered_columns]
             result_df = df[mask]
             return result_df
         except Exception as e:
@@ -103,7 +99,7 @@ class PSDPredictionAnalyzer:
         psd = PiecewiseSystemDiscovery(df, 
                 changepoints=self.best_model_ser.changepoints,
                 is_changepoint_removal=False,
-                model_name=self.model_name)
+                model_id=self.model_name)
         psd.fit()
         return psd
 
@@ -121,3 +117,28 @@ class PSDPredictionAnalyzer:
         grouped_df[cn.COL_CV] = grouped_df[(cn.COL_AUC, cn.COL_STD)] / grouped_df[(cn.COL_AUC, cn.COL_MEAN)]
 
         return pd.DataFrame(grouped_df)
+
+    @classmethod
+    def plotBestLinearFits(cls,
+            model_ids: list[Union[str, int]],
+            min_accuracy: float = DEFAULT_MIN_ACCURACY,
+            accuracy_statistic: str = DEFAULT_ACCURACY_STATISTIC,
+            is_guard_filename: bool = True,
+            data_dir: str = cn.PSD_DATA_DIR) -> None:
+        """
+        Plots the best linear fits for a list of model IDs.
+
+        Args:
+            model_ids (list[Union[str, int]]): A list of model identifiers (either numbers or names).
+            min_accuracy (float): The minimum accuracy threshold for predictions to be considered valid.
+            accuracy_statistic (str): The statistic to use for accuracy calculations.
+            is_guard_filename (bool): Whether to use the guard filename for the data files.
+            data_dir (str): The directory containing the data files.    
+        """
+        for model_id in model_ids:
+            analyzer = cls(model_id, min_accuracy=min_accuracy,
+                    accuracy_statistic=accuracy_statistic,
+                    is_guard_filename=is_guard_filename,
+                    data_dir=data_dir)
+            psd = analyzer.makeBestPSD()
+            psd.plotPiecewise(is_changepoint_plot=True, legend=False, num_true_point=60, is_nochangepoint_plot=False)

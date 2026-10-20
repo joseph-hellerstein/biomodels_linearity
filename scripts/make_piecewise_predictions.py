@@ -82,7 +82,7 @@ def processModel(
     try:
         psd = PiecewiseSystemDiscovery(df,
                 max_changepoint=max_changepoint,
-                model_name=model_name,
+                model_id=model_name,
                 coefficient_threshold=coefficient_threshold,
                 is_changepoint_removal=is_changepoint_removal,
                 max_fractional_reduction=max_fractional_reduction,

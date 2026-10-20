@@ -141,7 +141,7 @@ for max_changepoint in [0, 5, 10, 20]:
     for max_fractional_reduction in [0.001, 0.01]:
         psd = PiecewiseSystemDiscovery(df, max_changepoint=max_changepoint,
                 max_fractional_reduction=max_fractional_reduction,
-                model_name=str(model_num))
+                model_id=str(model_num))
         psd.fit()
         fig = psd.plotPiecewise(num_true_point=60, suptitle="",
                 is_nochangepoint_plot=False).fig

@@ -66,7 +66,7 @@ class TestPiecewiseSystemDiscoveryConstructor(unittest.TestCase):
         if IGNORE_TESTS:
             return
         df = _make_linear_df(n_points=100, noise_std=0.0)
-        psd = PiecewiseSystemDiscovery(df, model_name="test_model")
+        psd = PiecewiseSystemDiscovery(df, model_id="test_model")
         self.assertEqual(psd.model_name, "test_model")
         self.assertEqual(psd.species_names, ["A", "B"])
         self.assertEqual(psd.num_species, 2)
@@ -87,7 +87,7 @@ class TestPiecewiseSystemDiscoveryConstructor(unittest.TestCase):
         df = _make_linear_df(n_points=50)
         psd = PiecewiseSystemDiscovery(
             df, max_changepoint=3, max_fractional_reduction=0.2,
-            model_name="my_model",
+            model_id="my_model",
             changepoints=[10, 20],
         )
         self.assertEqual(psd.max_changepoint, 3)
@@ -309,7 +309,7 @@ class TestEndToEndBioModels548(unittest.TestCase):
             max_changepoint=2,
             poly_degree=1,
             coefficient_threshold=0.01,
-            model_name=BIOMODEL_548,
+            model_id=BIOMODEL_548,
         )
         defaults.update(overrides)
         return PiecewiseSystemDiscovery(self.tc.timecourse_df, **defaults)  # type: ignore
@@ -420,7 +420,7 @@ class TestChangepointSpecification(unittest.TestCase):
         new_changepoints = list(range(10, 990, 10))
         psd = PiecewiseSystemDiscovery(df,
                 changepoints=new_changepoints,
-                max_fractional_reduction=0.01, model_name=str(model_num))
+                max_fractional_reduction=0.01, model_id=str(model_num))
         psd.fit()
         self.assertEqual(psd.changepoints, new_changepoints)
 
@@ -433,7 +433,7 @@ class TestChangepointSpecification(unittest.TestCase):
         psd = PiecewiseSystemDiscovery(df,
                 max_changepoint=80,
                 is_changepoint_removal=False,
-                max_fractional_reduction=0.01, model_name=str(model_num))
+                max_fractional_reduction=0.01, model_id=str(model_num))
         psd.fit()
         self.assertEqual(len(psd.changepoints), 80)  # type: ignore
 
@@ -479,7 +479,7 @@ class TestEstimateAccuracyRate(unittest.TestCase):
             df,
             changepoints=cls.changepoints,
             is_changepoint_removal=False,
-            model_name="test_piecewise",
+            model_id="test_piecewise",
         )
         cls.psd.fit()
 
@@ -654,7 +654,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
         if IGNORE_TESTS:
             return
         df = _make_linear_df(n_points=100)
-        psd = PiecewiseSystemDiscovery(df, model_name="BIOMD0000009999", max_changepoint=3)
+        psd = PiecewiseSystemDiscovery(df, model_id="BIOMD0000009999", max_changepoint=3)
         result = psd._getChangepointsFromFile("/tmp/definitely_does_not_exist_for_this_test.csv")
         self.assertEqual(len(result), 0)
 
@@ -672,7 +672,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             }])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000009999", max_changepoint=2,
+                df, model_id="BIOMD0000009999", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             self.assertEqual(len(psd._getChangepointsFromFile(path)), 0)
@@ -693,7 +693,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             }])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             self.assertEqual(len(psd._getChangepointsFromFile(path)), 0)
@@ -714,7 +714,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             }])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             self.assertEqual(len(psd._getChangepointsFromFile(path)), 0)
@@ -737,7 +737,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             }])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             result = psd._getChangepointsFromFile(path)
@@ -761,7 +761,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             }])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             result = psd._getChangepointsFromFile(path)
@@ -784,7 +784,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             }])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             result = psd._getChangepointsFromFile(path)
@@ -810,7 +810,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             }])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             with self.assertRaises(ValueError):
@@ -832,7 +832,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             }])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             with self.assertRaises(ValueError):
@@ -865,7 +865,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             ])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             result = psd._getChangepointsFromFile(path)
@@ -895,7 +895,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             ])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             result = psd._getChangepointsFromFile(path)
@@ -929,7 +929,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             ])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             with self.assertRaises(ValueError):
@@ -960,7 +960,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             ])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             with self.assertRaises(ValueError):
@@ -989,7 +989,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             ])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             with self.assertRaises(ValueError):
@@ -1026,7 +1026,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             ])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             with self.assertRaises(ValueError):
@@ -1053,7 +1053,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             ])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             with self.assertRaises(ValueError):
@@ -1080,7 +1080,7 @@ class TestGetChangepointsFromFile(unittest.TestCase):
             ])
             df = _make_linear_df(n_points=100)
             psd = PiecewiseSystemDiscovery(
-                df, model_name="BIOMD0000000001", max_changepoint=2,
+                df, model_id="BIOMD0000000001", max_changepoint=2,
                 max_fractional_reduction=0.01,
             )
             with self.assertRaises(ValueError):
@@ -1120,7 +1120,7 @@ class TestEndToEndBioModel5ChangepointsFromFile(unittest.TestCase):
         # Create PiecewiseSystemDiscovery with changepoints from file
         psd = PiecewiseSystemDiscovery(
             tc.timecourse_df,
-            model_name="BIOMD0000000005",
+            model_id="BIOMD0000000005",
             max_changepoint=5000,
             max_fractional_reduction=0.0001,
             is_changepoints_from_file=True,
@@ -1154,7 +1154,7 @@ class TestEndToEndBioModel5ChangepointsFromFile(unittest.TestCase):
         # Create and fit PiecewiseSystemDiscovery with changepoints from file
         psd = PiecewiseSystemDiscovery(
             tc.timecourse_df,
-            model_name="BIOMD0000000005",
+            model_id="BIOMD0000000005",
             max_changepoint=5000,
             max_fractional_reduction=0.01,
             is_changepoints_from_file=True,
@@ -1184,7 +1184,7 @@ class TestEndToEndBioModel5ChangepointsFromFile(unittest.TestCase):
         # Create and fit PiecewiseSystemDiscovery with changepoints from file
         psd = PiecewiseSystemDiscovery(
             tc.timecourse_df,
-            model_name="BIOMD0000000005",
+            model_id="BIOMD0000000005",
             max_changepoint=5000,
             max_fractional_reduction=0.01,
             is_changepoints_from_file=True,
@@ -1214,7 +1214,7 @@ class TestEndToEndBioModel5ChangepointsFromFile(unittest.TestCase):
         # Create PiecewiseSystemDiscovery with changepoints from file
         psd = PiecewiseSystemDiscovery(
             tc.timecourse_df,
-            model_name="BIOMD0000000005",
+            model_id="BIOMD0000000005",
             max_changepoint=5000,
             max_fractional_reduction=0.0001,
             is_changepoints_from_file=True,
