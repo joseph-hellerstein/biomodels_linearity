@@ -40,7 +40,6 @@ class PiecewiseSystemDiscovery(object):
         Attributes mirror the column names produced by ``src.score.Score`` so they line up with CSV output.
         """
         min: float  # minimum species-level score (accuracy)
-        median: float  # median species-level accuracy
         max: float  # maximum species-level accuracy
         num_nonzero_term: int  # total number of non-zero ODE terms across all segments and species
 
@@ -287,8 +286,8 @@ class PiecewiseSystemDiscovery(object):
 
     def eliminateChangepoints(self, changepoints: List[int],
             col: str = "p10",
-            statistic: str = "mean",
-            num_estimate: int = 7) -> List[int]:
+            statistic: str = cn.COL_MEAN,
+            num_estimate: int = 3) -> List[int]:
         """Eliminates changepoints as long as the estimated reduction in accuracy is less than
         ``max_fractional_reduction`` relative to the baseline (full-changepoint) piecewise fit.
 
@@ -455,7 +454,38 @@ class PiecewiseSystemDiscovery(object):
 
         return new_models, new_boundaries
 
-    def _scoreFromSegmentList(self, models, boundaries, col=cn.COL_P10, statistic="median"):
+    @staticmethod
+    def _calculateAggregatedScore(df : pd.DataFrame, weight_arr : np.ndarray, col=cn.COL_P10, statistic=cn.COL_MEAN) -> float:
+        """Calculate an aggregated score across all segments and species.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame containing scores for each segment and species.
+        weights : np.ndarray
+            Weights for each segment, typically the segment lengths.
+        col : str
+            Column name in df to aggregate (e.g., ``cn.COL_P10``).
+        statistic : str
+            Aggregation: ``'min'``, ``'mean'``.
+
+        Returns
+        -------
+        float
+            Aggregated score across all segments and species.
+        """
+        if statistic == cn.COL_MIN:
+            return float(df[col].min())
+        elif statistic == cn.COL_MEAN:
+            # Calculate the weighted mean of the scores
+            mask = df[cn.COL_AGGREGATION_TYPE] == cn.COL_AGGREGATION_TYPE_MODEL
+            model_score_df = df[mask]
+            result = float(np.sum(model_score_df[col].to_numpy() * weight_arr) / np.sum(weight_arr))
+            return result
+        else:
+            raise ValueError(f"Unknown statistic: {statistic}")
+
+    def _scoreFromSegmentList(self, models, boundaries, col=cn.COL_P10, statistic=cn.COL_MEAN) -> float:
         """Score an arbitrary list of (model, boundary) pairs using the same aggregation 
         as :meth:`PiecewiseSystemDiscovery.score`.
 
@@ -468,7 +498,7 @@ class PiecewiseSystemDiscovery(object):
         col : str
             Score column name (e.g., ``cn.COL_P10``).
         statistic : str
-            Aggregation: ``'min'``, ``'median'`` or ``'mean'``.
+            Aggregation: ``'min'``, ``'mean'``.
 
         Returns
         -------
@@ -476,6 +506,7 @@ class PiecewiseSystemDiscovery(object):
             Aggregated score across all segments and species.
         """
         score_dfs = []
+        segment_lengths = []
         for model, (start, end) in zip(models, boundaries):
             test_seg_df = self.training_df.iloc[
                 (self.training_df.index >= start) & 
@@ -483,20 +514,14 @@ class PiecewiseSystemDiscovery(object):
             score_info = model.getScoreDetails(
                 test_df=test_seg_df, score_type="timecourse")
             score_dfs.append(score_info)
-
+            segment_lengths.append(end-start)
         if not score_dfs:
             raise RuntimeError("No segments to score.")
-
-        combined = pd.concat(score_dfs, ignore_index=True)
-
-        if statistic == "min":
-            return float(combined[col].min())
-        elif statistic == "median":
-            return float(combined[col].median())
-        elif statistic == "mean":
-            return float(combined[col].mean())
-        else:
-            raise ValueError(f"Unknown statistic: {statistic}")
+        #
+        segment_length_arr = np.array(segment_lengths)
+        combined_df = pd.concat(score_dfs, ignore_index=True)
+        #
+        return self._calculateAggregatedScore(combined_df, segment_length_arr, col=col, statistic=statistic)
 
     EstimatorResult = collections.namedtuple("EstimatorResult",
             ["accuracy_rate", "total_frob_dist", "delta_accuracy", "num_candidate",
@@ -510,7 +535,7 @@ class PiecewiseSystemDiscovery(object):
     def _estimateAccuracyRate(
             self,
             changepoints: List[int],
-            statistic: str = "min", col: str = cn.COL_P10,
+            statistic: str = cn.COL_MEAN, col: str = cn.COL_P10,
             num_estimation_changepoint: int =10,
             max_frac_frob_dist: float = 0.1) -> EstimatorResult:
         """Estimate the accuracy_rate, the reduction in accuracy per Frobenius Jacobian difference.
@@ -529,7 +554,7 @@ class PiecewiseSystemDiscovery(object):
         changepoints: List[int]
             Changepoints to consider
         statistic : str
-            Statistic for scoring: ``'min'``, ``'median'`` or ``'mean'``.  Defaults to ``"min"``.
+            Statistic for scoring: ``'min'``, ``'mean'``.  Defaults to ``"min"``.
         col : str
             Score column name, e.g., ``cn.COL_P10`` (default).
         num_estimation_changepoint: int
@@ -563,7 +588,6 @@ class PiecewiseSystemDiscovery(object):
         # Sort so positional indices into changepoint_arr align with the order used
         # by _makeFrobeniusDifferences() (which corresponds to self.changepoints, stored sorted).
         changepoint_arr = np.sort(changepoint_arr)
-
         # 1. Get Frobenius distances between consecutive segment Jacobians.
         frob_dist_arr = np.array(self._makeFrobeniusDistances())
         total_frob_dist = np.sum(frob_dist_arr)
@@ -776,7 +800,7 @@ class PiecewiseSystemDiscovery(object):
                 species_names: Optional[List[str]] = None,
                 is_nochangepoint_plot: bool = True,
                 is_changepoint_plot: bool = True,
-                statistic: str = "mean",
+                statistic: str = cn.COL_MEAN,
                 **plt_kwargs: Any) -> PlotOptions:
         """Two-panel comparison: 0 change points (top) vs max_changepoint (bottom).
 
@@ -874,7 +898,7 @@ class PiecewiseSystemDiscovery(object):
                 auc_title = f", AUC={auc:.3f}"
             else:
                 auc_title = ""
-            po.title = model_num_str + ": " + plt_options.get("title", "") + f" (Median species p10 accuracy={score:.3f}{auc_title})"
+            po.title = model_num_str + ": " + plt_options.get("title", "") + f" ({statistic} species p10 accuracy={score:.3f}{auc_title})"
             if ymax > 0.0:
                 po.ylim = (0.0, ymax)
             po.apply()
@@ -898,19 +922,12 @@ class PiecewiseSystemDiscovery(object):
         print(str(self))
 
     def score(self, test_df: Optional[pd.DataFrame] = None, score_type="timecourse",
-            col: str = cn.COL_P10, statistic: str = "mean") -> float:
+            col: str = cn.COL_P10, statistic: str = cn.COL_MEAN) -> float:
         """Return the average score across all subsequences.
         statistic:
-            min, median, mean
+            min, mean
         """
         self._requireFitted()
         score_df = self.getScoreDetails(test_df=test_df, score_type=score_type)
-        if statistic == "min":
-            return float(score_df[col].min())
-        elif statistic == "mean":
-            mask = score_df[cn.COL_AGGREGATION_TYPE] == cn.COL_AGGREGATION_TYPE_MODEL
-            model_score_df = score_df[mask]
-            result = float(np.sum(model_score_df[col].to_numpy() * self._subsequence_lengths) / self.num_point)
-            return result
-        else:
-            raise ValueError("statistic must be 'min' or 'mean'")
+        return self._calculateAggregatedScore(score_df, 
+                np.array(self._subsequence_lengths), col=col, statistic=statistic)
