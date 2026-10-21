@@ -776,7 +776,7 @@ class PiecewiseSystemDiscovery(object):
                 species_names: Optional[List[str]] = None,
                 is_nochangepoint_plot: bool = True,
                 is_changepoint_plot: bool = True,
-                statistic: str = "median",
+                statistic: str = "mean",
                 **plt_kwargs: Any) -> PlotOptions:
         """Two-panel comparison: 0 change points (top) vs max_changepoint (bottom).
 
@@ -797,7 +797,7 @@ class PiecewiseSystemDiscovery(object):
         is_changepoint_plot: bool
             Plot with changepoints
         statistic: str
-            Statistic to use for scoring the piecewise model.  Defaults to "median".
+            Statistic to use for scoring the piecewise model.  Defaults to "mean".
 
         **plt_kwargs
             Forwarded to PlotOptions. Supported keys: fig, ax, title, xlabel,
@@ -898,7 +898,7 @@ class PiecewiseSystemDiscovery(object):
         print(str(self))
 
     def score(self, test_df: Optional[pd.DataFrame] = None, score_type="timecourse",
-            col: str = cn.COL_P10, statistic: str = "median") -> float:
+            col: str = cn.COL_P10, statistic: str = "mean") -> float:
         """Return the average score across all subsequences.
         statistic:
             min, median, mean
@@ -907,9 +907,10 @@ class PiecewiseSystemDiscovery(object):
         score_df = self.getScoreDetails(test_df=test_df, score_type=score_type)
         if statistic == "min":
             return float(score_df[col].min())
-        elif statistic == "median":
-            return float(score_df[col].median())
         elif statistic == "mean":
-            return float(score_df[col].mean())
+            mask = score_df[cn.COL_AGGREGATION_TYPE] == cn.COL_AGGREGATION_TYPE_MODEL
+            model_score_df = score_df[mask]
+            result = float(np.sum(model_score_df[col].to_numpy() * self._subsequence_lengths) / self.num_point)
+            return result
         else:
-            raise ValueError("statistic must be 'min' or 'median' or 'mean'")
+            raise ValueError("statistic must be 'min' or 'mean'")
