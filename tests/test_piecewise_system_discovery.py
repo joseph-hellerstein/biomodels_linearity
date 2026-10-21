@@ -548,7 +548,7 @@ class TestIncrementalMergeConsistency(unittest.TestCase):
         new_score = psd._scoreFromSegmentList(
             trial_models, trial_boundaries, col=cn.COL_P10, statistic="mean")
 
-        surviving_cps = [int(cp) for i, cp in enumerate(psd.changepoints)
+        surviving_cps = [int(cp) for i, cp in enumerate(cast(List[int], psd.changepoints))
                 if i not in set(remove_positions)]
         trial_psd_old = PiecewiseSystemDiscovery(
             self.df.copy(), changepoints=surviving_cps, is_changepoint_removal=False,
