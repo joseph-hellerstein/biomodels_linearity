@@ -7,9 +7,8 @@ import types
 import unittest
 from typing import Optional, cast, Any
 from unittest.mock import patch
-
-import matplotlib  # noqa: F401 -- non-interactive backend needed before pyplot
-matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: F401 -- non-interactive backend needed before pyplot
+#matplotlib.use("Agg")
 
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
@@ -723,6 +722,20 @@ class TestPlotBestLinearFits(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self._run([5, 10])
         mock_plot.assert_not_called()  # type: ignore
+
+@unittest.skip("Test is timeconsuming and not needed for every run; run manually when debugging.")
+class TestBugs(unittest.TestCase):
+    """Regression tests for bugs that have been fixed."""
+
+    def test_bad_accuracy(self) -> None:
+        """Accuracy of plot doesn't match the plots themselves."""
+        analyzer = PSDPredictionAnalyzer(904)
+        try:
+            psd = analyzer.makeBestPSD()
+            _ = psd.plotPiecewise(legend=False, num_true_point=60, is_nochangepoint_plot=False)
+            plt.show()
+        except Exception as e:
+            import pdb; pdb.set_trace()
 
 
 if __name__ == "__main__":

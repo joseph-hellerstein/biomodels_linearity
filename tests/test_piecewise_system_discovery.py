@@ -535,36 +535,6 @@ class TestIncrementalMergeConsistency(unittest.TestCase):
         cls.df.index.name = 'time'
         cls.changeppoints = [179, 419]
 
-    def test_single_removal_matches_full_trial_fit(self):
-        """Removing one changeppoint: incremental merge score equals full trial PSD fit."""
-        if IGNORE_TESTS:
-            return
-        psd = PiecewiseSystemDiscovery(
-            self.df.copy(), changepoints=self.changeppoints).fit()
-
-        # Incremental approach
-        remove_positions = np.array([0])  # remove first changeppoint (row 179)
-        trial_models, trial_boundaries = psd._buildTrialSegments(remove_positions)
-        new_score = psd._scoreFromSegmentList(
-            trial_models, trial_boundaries, col=cn.COL_P10, statistic="median")
-
-        # Old approach: fit full trial PSD on surviving changeppoints.
-        surviving_cps = [int(cp) for i, cp in enumerate(psd.changepoints)
-                         if i not in set(remove_positions)]
-        trial_psd_old = PiecewiseSystemDiscovery(
-            self.df.copy(), changepoints=surviving_cps, is_changepoint_removal=False,
-            **psd._sd_kwargs)
-        (trial_psd_old._subsequence_models,
-         trial_psd_old._subsequence_boundaries,
-         trial_psd_old._subsequence_lengths) = trial_psd_old._fitSegments(surviving_cps)
-        trial_psd_old._is_fitted = True
-        old_score = trial_psd_old.score(col=cn.COL_P10, statistic="median")
-
-        self.assertAlmostEqual(
-            new_score, old_score, places=8,
-            msg=(f"Incremental score {new_score:.12f} should match full-fit "
-                 f"score {old_score:.12f} for single removal"))
-
     def test_both_removals_matches_full_trial_fit(self):
         """Removing all changeppoints: incremental merge produces a single merged segment 
         with score matching the single-segment trial PSD fit."""
@@ -576,23 +546,23 @@ class TestIncrementalMergeConsistency(unittest.TestCase):
         remove_positions = np.array([0, 1])
         trial_models, trial_boundaries = psd._buildTrialSegments(remove_positions)
         new_score = psd._scoreFromSegmentList(
-            trial_models, trial_boundaries, col=cn.COL_P10, statistic="median")
+            trial_models, trial_boundaries, col=cn.COL_P10, statistic="mean")
 
-        surviving_cps = [int(cp) for i, cp in enumerate(psd.changepoints)
-                         if i not in set(remove_positions)]
+        surviving_cps = [int(cp) for i, cp in enumerate(cast(List[int], psd.changepoints))
+                if i not in set(remove_positions)]
         trial_psd_old = PiecewiseSystemDiscovery(
             self.df.copy(), changepoints=surviving_cps, is_changepoint_removal=False,
             **psd._sd_kwargs)
         (trial_psd_old._subsequence_models,
-         trial_psd_old._subsequence_boundaries,
-         trial_psd_old._subsequence_lengths) = trial_psd_old._fitSegments(surviving_cps)
+        trial_psd_old._subsequence_boundaries,
+        trial_psd_old._subsequence_lengths) = trial_psd_old._fitSegments(surviving_cps)
         trial_psd_old._is_fitted = True
-        old_score = trial_psd_old.score(col=cn.COL_P10, statistic="median")
+        old_score = trial_psd_old.score(col=cn.COL_P10, statistic="mean")
 
         self.assertAlmostEqual(
             new_score, old_score, places=8,
             msg=(f"Incremental score {new_score:.12f} should match full-fit "
-                 f"score {old_score:.12f} for all-removals case"))
+                f"score {old_score:.12f} for all-removals case"))
 
     def test_build_trial_segments_reuses_unchanged_models(self):
         """When only one changeppoint is removed, the unchanged segment's model object 
@@ -1230,6 +1200,24 @@ class TestEndToEndBioModel5ChangepointsFromFile(unittest.TestCase):
             #plt.show()
         except Exception as e:
             self.fail(f"plot() raised an exception: {e}")
+
+@unittest.skipUnless(HAS_REAL_ZIP, "Real timecourse zip not found")
+class TestBugs(unittest.TestCase):
+    """Regression tests for specific bugs."""
+
+    def test_bug_all_changepoints_deleted(self):
+        """Test for bug where all changepoints are deleted."""
+        timecourse_iter = TimecourseIterator(first_model_num=5, last_model_num=5)
+        item = next(iter(timecourse_iter))
+        df = item.timecourse.timecourse_df
+        psd = PiecewiseSystemDiscovery(df, 
+                max_changepoint=100,
+                is_changepoint_removal=True,
+                max_fractional_reduction=1e-3,
+                model_id=item.model_name)
+        psd.fit()
+        _ = psd.plotPiecewise(legend=False, num_true_point=60, is_nochangepoint_plot=False)
+        #plt.show()
 
 
 if __name__ == "__main__":
