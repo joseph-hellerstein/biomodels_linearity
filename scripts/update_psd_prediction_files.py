@@ -17,6 +17,10 @@ Usage::
     python scripts/update_psd_prediction_files.py [--dry-run] [--verbose]
 '''
 import os
+import numpy as np
+import ast
+
+
 
 import src.constants as cn  # noqa: E402
 import src.util as util  # type: ignore
@@ -87,7 +91,21 @@ def _addBoundariesColumn(item: PSDPredictionItem) -> int:
     Note that this function may fail if the changepoints list is empty or invalid, in which case the caller should handle the exception.
     """
     df = item.df
-    df[cn.COL_BOUNDARIES] = df.apply(lambda row: [0] + eval(row[cn.COL_CHANGEPOINTS]) + [item.num_point - 1], axis=1)
+    try:
+        # Convert if needed
+        df[cn.COL_CHANGEPOINTS] = df[cn.COL_CHANGEPOINTS].apply(ast.literal_eval)
+    except Exception as e:
+        pass
+    boundaries_list = []
+    for _, row in df.iterrows():
+        changepoints = row[cn.COL_CHANGEPOINTS]
+        if isinstance(changepoints, str):
+            raise ValueError(f"Expected a list of changepoints, got {type(changepoints)}")
+        boundaries = [0] + sorted(changepoints) + [item.num_point - 1]
+        if not isinstance(boundaries[0], (int, float)):
+            raise ValueError(f"Expected a list of integers or floats for changepoints, got {type(changepoints[0])}")
+        boundaries_list.append(boundaries)
+    df[cn.COL_BOUNDARIES] = boundaries_list
     return len(df)
 
 # Order matters in the list of tasks

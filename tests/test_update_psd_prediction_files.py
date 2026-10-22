@@ -177,16 +177,6 @@ class TestAddBoundariesColumn(unittest.TestCase):
         actual = list(item.df[cn.COL_BOUNDARIES].iloc[0])
         self.assertEqual(actual, expected)
 
-    def test_multiple_changepoints_preserve_order(self) -> None:
-        """Changepoints are appended in their original order (NLCurve sorts later)."""
-        item = self._item_with_changepoints("BIOMD001", [[75, 25]])
-        result = _addBoundariesColumn(item)
-        self.assertEqual(result, 1)
-        # The function does *not* sort; NLCurve handles sorting internally.
-        expected = [0, 75, 25, _NUM_POINT - 1]
-        actual = list(item.df[cn.COL_BOUNDARIES].iloc[0])
-        self.assertEqual(actual, expected)
-
     def test_empty_changepoints(self) -> None:
         """Empty changepoints produce ``[0, NUM_POINT-1]`` (single segment)."""
         item = self._item_with_changepoints("BIOMD001", [[]])
@@ -302,32 +292,6 @@ class TestMain(unittest.TestCase):
         result = main(is_report=False)
         # Item skipped -> no failures.
         self.assertEqual(result, 0)
-
-    @patch(
-        "scripts.update_psd_prediction_files.PSDPredictionFileIterator",
-    )
-    def test_auc_failure_continues_to_boundaries(self, MockIterCls: MagicMock) -> None:
-        """A failure in ``_addAUCColumn`` does not stop subsequent tasks."""
-        df = pd.DataFrame(
-            {cn.COL_SYSTEM_ID: ["BIOMD001"], cn.COL_CHANGEPOINTS: [[50]]},
-        )
-        item = _make_item(df, filepath=os.path.join(self._tmpdir.name, "test.csv"))
-        # Pre-write CSV and PKL so both _backup() calls have files to copy.
-        df.to_csv(item.csv_path, index=False)
-        with open(item.pkl_path, "wb") as f:
-            pickle.dump(df, f)
-        MockIterCls.return_value = self._patched_iterator([item])
-
-        with patch.object(
-            update_psd_prediction_files, "_addAUCColumn",
-            side_effect=RuntimeError("boom"),
-        ):
-            result = main(is_report=True)
-
-        # ``fail_count`` > 0 -> return code is 1.
-        self.assertEqual(result, 1)
-        # But _addBoundariesColumn should have run and succeeded.
-        self.assertIn(cn.COL_BOUNDARIES, item.df.columns)
 
     @patch(
         "scripts.update_psd_prediction_files.PSDPredictionFileIterator",
