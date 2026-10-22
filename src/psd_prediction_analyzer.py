@@ -21,6 +21,7 @@ class PSDPredictionAnalyzer:
             min_accuracy : float = DEFAULT_MIN_ACCURACY,
             accuracy_statistic: str = DEFAULT_ACCURACY_STATISTIC,
             is_guard_filename: bool = True,
+            timecourse_df: pd.DataFrame | None = None,
             data_dir: str = cn.PSD_DATA_DIR) -> None:
         """Construct a PSDPredictionAnalyzer object.
 
@@ -29,6 +30,7 @@ class PSDPredictionAnalyzer:
             min_accuracy (float): The minimum accuracy threshold for predictions to be considered valid.
             accuracy_statistic (str): The statistic to use for accuracy calculations.
             is_guard_filename (bool): Whether to use the guard filename for the data files.
+            timecourse_df (pd.DataFrame | None): The timecourse data for the model.
             data_dir (str): The directory containing the data files.
         """
         self.model_num, self.model_name = Model.getModelNumberAndName(model_id)
@@ -36,6 +38,7 @@ class PSDPredictionAnalyzer:
         self.min_accuracy = min_accuracy
         self.accuracy_statistic = accuracy_statistic
         self.is_guard_filename = is_guard_filename
+        self.timecourse_df = timecourse_df
         self.model_df = self.getModelDF() # DataFrame with PSD predictions for the model
         self.best_model_ser = self._getModelBestSer()  # Best PSD prediction
 
@@ -93,10 +96,13 @@ class PSDPredictionAnalyzer:
         Returns:
             Model: A Model object representing the best PSD prediction.
         """
-        df = TimecourseIterator.getTimecourse(self.model_name).timecourse_df
+        if self.timecourse_df is None:
+            timecourse_df = TimecourseIterator.getTimecourse(self.model_name).timecourse_df
+        else:
+            timecourse_df = self.timecourse_df
         if self.best_model_ser is None:
             raise ValueError(f"No valid PSD predictions found for model {self.model_name} with min_accuracy {self.min_accuracy}.")
-        psd = PiecewiseSystemDiscovery(df, 
+        psd = PiecewiseSystemDiscovery(timecourse_df, 
                 changepoints=self.best_model_ser.changepoints,
                 is_changepoint_removal=False,
                 model_id=self.model_name)

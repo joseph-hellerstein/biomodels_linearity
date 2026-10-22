@@ -46,7 +46,7 @@ def _backup(item: PSDPredictionItem, is_pkl: bool = False) -> Path:
     path = Path(item.pkl_path) if is_pkl else Path(item.csv_path)
     filepath = Path(path)
     backup_path = Path(filepath.with_suffix(filepath.suffix + ".bak"))
-    if not os.path.exists(backup_path):
+    if os.path.exists(filepath) and not os.path.exists(backup_path):
         shutil.copy2(filepath, backup_path)
     #
     if is_pkl:
@@ -87,12 +87,13 @@ def _addBoundariesColumn(item: PSDPredictionItem) -> int:
     Note that this function may fail if the changepoints list is empty or invalid, in which case the caller should handle the exception.
     """
     df = item.df
-    df[cn.COL_BOUNDARIES] = df.apply(lambda row: [0] + row[cn.COL_CHANGEPOINTS] + [item.num_point - 1], axis=1)
+    df[cn.COL_BOUNDARIES] = df.apply(lambda row: [0] + eval(row[cn.COL_CHANGEPOINTS]) + [item.num_point - 1], axis=1)
     return len(df)
 
+# Order matters in the list of tasks
 UPDATE_TASKS = [
-    UpdateTask(column=cn.COL_AUC, func=_addAUCColumn),
     UpdateTask(column=cn.COL_BOUNDARIES, func=_addBoundariesColumn),
+    UpdateTask(column=cn.COL_AUC, func=_addAUCColumn),
 ]
 
 ############################
@@ -106,7 +107,7 @@ def main(is_report: bool = False):
         if is_report:
             print(msg)
 
-    psd_iterator = PSDPredictionFileIterator(is_pkl=True)
+    psd_iterator = PSDPredictionFileIterator(is_pkl=False, is_report=True)
 
     fail_count = 0
     success_count = 0
