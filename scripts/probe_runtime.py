@@ -34,7 +34,7 @@ def probe(method, max_cp):
     saved_f = psd._is_fitted
     t2 = time.perf_counter()
     psd._is_fitted = True
-    score = float(psd.score(test_df=df))
+    score = float(psd.score())
     st = time.perf_counter() - t2
     print(f"  psd.score(): {st:.2f}s -> p10={score:.3f}")
     psd._is_fitted = saved_f

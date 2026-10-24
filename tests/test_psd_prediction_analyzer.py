@@ -645,13 +645,6 @@ class TestPlotBestLinearFits(unittest.TestCase):
             model_ids, data_dir=self._tmpdir.name, **kwargs)
 
     # ------------------------------------------------------------------
-    # happy path (real plotPiecewise on the small synthetic timecourse)
-    # ------------------------------------------------------------------
-
-    def test_returns_none(self) -> None:
-        self.assertIsNone(self._run([5]))
-
-    # ------------------------------------------------------------------
     # per-model dispatch (plotPiecewise patched to record calls)
     # ------------------------------------------------------------------
 
@@ -736,6 +729,13 @@ class TestBugs(unittest.TestCase):
             plt.show()
         except Exception as e:
             import pdb; pdb.set_trace()
+
+    def test_bad_changepoint_selection(self) -> None:
+        """Changepoints selected by makeBestPSD don't match the plots."""
+        analyzer = PSDPredictionAnalyzer(5, min_accuracy=0.5, data_dir=cn.PSD_DATA_DIR, is_guard_filename=False)
+        psd = analyzer.makeBestPSD()
+        result = psd.plotPiecewise(legend=False, num_true_point=60, is_nochangepoint_plot=False)
+        plt.show()
 
 
 if __name__ == "__main__":

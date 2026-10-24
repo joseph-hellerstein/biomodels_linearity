@@ -138,6 +138,8 @@ class SystemDiscovery:
         species_names: Union[list[str], None] = None,
         bias_species: Union[list[str], None] = None,
         is_normalize: bool = True,
+        accuracy_col: str = cn.DEF_ACCURACY_COL,
+        accuracy_stat: str = cn.DEF_ACCURACY_STAT,
     ) -> None:
         self.model_id = model_id
         self.training_df = training_df
@@ -157,6 +159,8 @@ class SystemDiscovery:
 
         self.species_cols = species_cols
         self.num_species = len(species_cols)
+        self.accuracy_col = accuracy_col
+        self.accuracy_stat = accuracy_stat
         self._time_arr = self.training_df.index.to_numpy(dtype=float)
         self._X_arr: np.ndarray = self.training_df[species_cols].to_numpy(dtype=float)
         self._Xdot_arr: np.ndarray = np.diff(self._X_arr, axis=0) / np.diff(self._time_arr).reshape(-1,1)
@@ -522,7 +526,7 @@ class SystemDiscovery:
         return score_df
     
     def getScoreAggregatedBySpecies(self, test_df: pd.DataFrame = NULL_DF, score_type: str = "timecourse",
-                statistic_column: str = "p95") -> Dict[str, float]:
+                accuracy_col: str = cn.DEF_ACCURACY_COL) -> Dict[str, float]:
         """Aggregate species-level scores into a model-level statistics
 
         Parameters
@@ -533,7 +537,7 @@ class SystemDiscovery:
             The type of score to calculate.  Must be one of:
             - ``"derivative"``: R² on predicted vs numerical derivatives of concentrations.
             - ``"timecourse"``: R² for the species timecourses
-        statistic_column : str
+        accuracy_col : str
             The column name in the score DataFrame to aggregate
 
         Returns
@@ -547,10 +551,10 @@ class SystemDiscovery:
         if species_df.empty:
             raise ValueError("No model-level score found in the provided DataFrame.")
         return {
-            "mean": float(species_df[statistic_column].mean()),
-            "min": float(species_df[statistic_column].min()),
-            "max": float(species_df[statistic_column].max()),
-            "median": float(species_df[statistic_column].median()),
+            cn.COL_MEAN: float(species_df[accuracy_col].mean()),
+            cn.COL_MIN: float(species_df[accuracy_col].min()),
+            cn.COL_MAX: float(species_df[accuracy_col].max()),
+            cn.COL_P50: float(species_df[accuracy_col].median()),
         }
 
     @classmethod
@@ -894,35 +898,27 @@ class SystemDiscovery:
         """Pretty-print the discovered ODE equations."""
         print(self.__str__())
 
-    def score(self, col: str = cn.COL_P10, statistic: str = "median") -> float:
+    def score(self) -> float:
         """
         Calculates a single measure of model performance based on a particular
         aggregation of species-level accuracy scores.
         
-
-        Parameters
-        ----------
-        col : str
-            The column name in the score DataFrame to use for R².  Default is
-        statistic: str
-            Choices are "min", "median", "mean"
-
         Returns
         -------
         float
             The calculated score.
         """
         score_detail_df = self.getScoreDetails(score_type="timecourse")
-        model_sel = score_detail_df[cn.COL_AGGREGATION_TYPE] != "model"
-        vals = score_detail_df[model_sel][col].to_numpy(dtype=float)
-        if statistic == "min":
+        model_sel = score_detail_df[cn.COL_AGGREGATION_TYPE] != cn.COL_AGGREGATION_TYPE_MODEL
+        vals = score_detail_df[model_sel][self.accuracy_col].to_numpy(dtype=float)
+        if self.accuracy_stat == cn.COL_MIN:
             result = float(np.min(vals))
-        elif statistic == "median":
+        elif self.accuracy_stat == cn.COL_P50:
             result = float(np.median(vals))
-        elif statistic == "mean":
+        elif self.accuracy_stat == cn.COL_MEAN:
             result = float(np.mean(vals))
         else:
-            raise ValueError(f"Invalid statistic '{statistic}'. Must be 'min', 'median', or 'mean'.")
+            raise ValueError(f"Invalid statistic '{self.accuracy_stat}'. Must be 'min', 'median', or 'mean'.")
         return result
 
     def summary(self, entry_threshold: float = 0) -> pd.DataFrame:

@@ -3,9 +3,7 @@
 import os
 import pickle
 import pandas as pd # type: ignore
-from typing import Iterator, Optional, Callable, Union, cast, Dict, Any
-
-from tomlkit import key
+from typing import Callable, Iterator, Optional
 
 import src.constants as cn  # type: ignore
 from src import util  # type: ignore
@@ -78,18 +76,21 @@ class PSDPredictionFileIterator:
 
     def __init__(self, is_pkl: bool = False,
             data_dir: str = cn.PSD_DATA_DIR,
+            is_report: bool = False,
             is_guard_filename: bool = False) -> None:
         """
         Initialize the iterator.
 
         Args:
             is_pkl: If True, iterate over pickle files. If False, iterate over CSV files.
-            data_dir: Directory to iterate over.:w
+            data_dir: Directory to iterate over.
+            is_report: If True, print progress information.
             is_guard_filename: If True, guard against filenames that don't match the expected
                 pattern. If False, skip the guard and allow any filename to be processed.
         """
         self.is_pkl = is_pkl
         self.data_dir = data_dir
+        self.is_report = is_report
         self.is_guard_filenames = is_guard_filename
 
     def _load_dataframe(self, filepath: str) -> pd.DataFrame:
@@ -134,7 +135,8 @@ class PSDPredictionFileIterator:
         """
         if not os.path.isdir(self.data_dir):
             return
-        
+        if self.is_report:
+            print(f"Iterating over {self.data_dir}")
 
         # Find all relevant files
         ffiles = sorted([f for f in os.listdir(self.data_dir)])
@@ -145,6 +147,8 @@ class PSDPredictionFileIterator:
                 or ((not self.is_pkl) and f.endswith(".csv"))]
 
         for filename in ffiles:
+            if self.is_report:
+                print(f"Processing {filename}")
             if self.is_guard_filenames and not self._validateFileMetatdata(filename):
                 continue
             # Get the full path to the file

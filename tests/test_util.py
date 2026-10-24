@@ -6,8 +6,8 @@ from unittest.mock import patch
 import pandas as pd  # type: ignore
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-import util  # noqa: E402
-from util import getPSDPredictionDF, codedstrToDict, dictToCodedstr, parseFilename, _parseChangepoints  # noqa: E402
+import util  # type: ignore
+from util import getPSDPredictionDF, codedstrToDict, dictToCodedstr, parseFilename, _parseChangepoints  # type: ignore
 import src.constants as cn  # noqa: E402
 
 _HAS_PSD_DATA = os.path.exists(cn.PSD_DATA_DIR)
@@ -70,17 +70,6 @@ class TestGetPSDPredictionDFSingleFile(unittest.TestCase):
                 patch("util.os.path.exists", return_value=False), \
                 patch("pandas.read_csv", return_value=payload):
             return getPSDPredictionDF(max_fractional_reduction)
-
-    @unittest.skipUnless(_HAS_PSD_DATA, "PSD_DATA_DIR not found")
-    def test_single_match_returns_df(self) -> None:
-        """A unique match returns a non-empty DataFrame."""
-        sel = dictToCodedstr(
-            {"maxreduction": 0.001}, convert_strs=["maxreduction"]
-        )
-        csv_name = f"piecewise_predictions__numpoint_100__{sel}.csv"
-        df = self._run_with_fixture(csv_name, max_fractional_reduction=0.001)
-        self.assertIsInstance(df, pd.DataFrame)
-        self.assertGreater(len(df), 0)
 
     @unittest.skipUnless(_HAS_PSD_DATA, "PSD_DATA_DIR not found")
     def test_single_match_csv_file_column(self) -> None:

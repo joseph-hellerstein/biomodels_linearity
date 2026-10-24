@@ -545,10 +545,23 @@ class TestScoreBiomodel278(unittest.TestCase):
         # pandas comparison `NaN <= x` returns False, not NaN — dropping them makes the intent explicit.
         self.assertTrue((valid.dropna() <= 1.0).all().all())
 
+    def _modelAccuracy(self, accuracy_col: str) -> float:
+        """Percentile-across-species of each species' chosen-percentile accuracy.
+
+        Equivalent to the old (now-removed) ``Score.calculateModelAccuracy``: the
+        ``"model"`` aggregation row's ``accuracy_col`` column already holds exactly
+        this double-percentile aggregation (see ``Score.add``/``StatisticCalculator``).
+        """
+        score = Score(accuracy_col=accuracy_col)
+        score.add(self.true_df, self.pred_df, system_id=self._MODEL_NAME)
+        model_row = score.score_df[
+            score.score_df[cn.COL_AGGREGATION_TYPE] == cn.COL_AGGREGATION_TYPE_MODEL]
+        return float(model_row[accuracy_col].iloc[0])
+
     def test_calculate_accuracy_percentile_returns_series_per_species(self) -> None:
         """Per-species percentile accuracy returns one value per species in BIOMD278."""
         ser = Score.calculateAccuracyPercentile(
-            self.true_df, self.pred_df, col_percentile=cn.COL_P95
+            self.true_df, self.pred_df, accuracy_col=cn.COL_P95
         )
         self.assertIsInstance(ser, pd.Series)
         # Should have exactly 3 values (one per species R, B, C).
@@ -557,9 +570,7 @@ class TestScoreBiomodel278(unittest.TestCase):
 
     def test_calculate_model_accuracy_returns_single_float(self) -> None:
         """Model-level accuracy is a single float for BIOMD278."""
-        val = Score.calculateModelAccuracy(
-            self.true_df, self.pred_df, col_percentile=cn.COL_P90,
-        )
+        val = self._modelAccuracy(cn.COL_P90)
         self.assertIsInstance(val, (float, np.floating))
         self.assertGreaterEqual(val, 0.0)
         self.assertLessEqual(val, 1.0)
@@ -666,23 +677,15 @@ class TestScoreBiomodel278(unittest.TestCase):
         self.assertTrue(np.isnan(val) or val == -1.0)
 
     def test_model_accuracy_is_consistent_across_runs(self) -> None:
-        """calculateModelAccuracy returns identical values for identical inputs."""
-        v1 = Score.calculateModelAccuracy(
-            self.true_df, self.pred_df, col_percentile=cn.COL_P95
-        )
-        v2 = Score.calculateModelAccuracy(
-            self.true_df, self.pred_df, col_percentile=cn.COL_P95
-        )
+        """Model-level accuracy is identical for identical inputs."""
+        v1 = self._modelAccuracy(cn.COL_P95)
+        v2 = self._modelAccuracy(cn.COL_P95)
         self.assertAlmostEqual(float(v1), float(v2))
 
     def test_percentile_parameter_is_used(self) -> None:
         """Changing percentile changes the aggregation result."""
-        p50 = Score.calculateModelAccuracy(
-            self.true_df, self.pred_df, col_percentile=cn.COL_P50
-        )
-        p99 = Score.calculateModelAccuracy(
-            self.true_df, self.pred_df, col_percentile=cn.COL_P99
-        )
+        p50 = self._modelAccuracy(cn.COL_P50)
+        p99 = self._modelAccuracy(cn.COL_P99)
         self.assertLessEqual(p50, p99)
 
 

@@ -1257,7 +1257,7 @@ class TestGetScoreAggregatedBySpecies(unittest.TestCase):
         df = _make_linear_df(noise_std=0.01)
         disc = self._make_fitted_disc(df)
         result = disc.getScoreAggregatedBySpecies()
-        expected_keys = {"mean", "min", "max", "median"}
+        expected_keys = {"mean", "min", "max", "p50"}
         self.assertEqual(set(result.keys()), expected_keys)
 
     def test_returns_float_values(self) -> None:
@@ -1288,7 +1288,7 @@ class TestGetScoreAggregatedBySpecies(unittest.TestCase):
         disc = self._make_fitted_disc(df)
         result = disc.getScoreAggregatedBySpecies(score_type="derivative")
         self.assertIsInstance(result, dict)
-        self.assertEqual(set(result.keys()), {"mean", "min", "max", "median"})
+        self.assertEqual(set(result.keys()), {"mean", "min", "max", "p50"})
 
     def test_timecourse_score_type(self) -> None:
         """getScoreAggregatedBySpecies works with score_type='timecourse'."""
@@ -1298,7 +1298,7 @@ class TestGetScoreAggregatedBySpecies(unittest.TestCase):
         disc = self._make_fitted_disc(df)
         result = disc.getScoreAggregatedBySpecies(score_type="timecourse")
         self.assertIsInstance(result, dict)
-        self.assertEqual(set(result.keys()), {"mean", "min", "max", "median"})
+        self.assertEqual(set(result.keys()), {"mean", "min", "max", "p50"})
 
     def test_with_test_df(self) -> None:
         """getScoreAggregatedBySpecies works with a provided test DataFrame."""
@@ -1311,7 +1311,7 @@ class TestGetScoreAggregatedBySpecies(unittest.TestCase):
         disc.fit()
         result = disc.getScoreAggregatedBySpecies(test_df=test_df)
         self.assertIsInstance(result, dict)
-        self.assertEqual(set(result.keys()), {"mean", "min", "max", "median"})
+        self.assertEqual(set(result.keys()), {"mean", "min", "max", "p50"})
 
     def test_statistic_column_mean(self) -> None:
         """getScoreAggregatedBySpecies works with statistic_column='mean'."""
@@ -1319,7 +1319,7 @@ class TestGetScoreAggregatedBySpecies(unittest.TestCase):
             return
         df = _make_linear_df(noise_std=0.01)
         disc = self._make_fitted_disc(df)
-        result = disc.getScoreAggregatedBySpecies(statistic_column="mean")
+        result = disc.getScoreAggregatedBySpecies(accuracy_col="mean")
         self.assertIsInstance(result, dict)
 
     def test_statistic_column_p95(self) -> None:
@@ -1328,7 +1328,7 @@ class TestGetScoreAggregatedBySpecies(unittest.TestCase):
             return
         df = _make_linear_df(noise_std=0.01)
         disc = self._make_fitted_disc(df)
-        result = disc.getScoreAggregatedBySpecies(statistic_column="p95")
+        result = disc.getScoreAggregatedBySpecies(accuracy_col="p95")
         self.assertIsInstance(result, dict)
 
     def test_statistic_column_p50(self) -> None:
@@ -1337,7 +1337,7 @@ class TestGetScoreAggregatedBySpecies(unittest.TestCase):
             return
         df = _make_linear_df(noise_std=0.01)
         disc = self._make_fitted_disc(df)
-        result = disc.getScoreAggregatedBySpecies(statistic_column="p50")
+        result = disc.getScoreAggregatedBySpecies(accuracy_col="p50")
         self.assertIsInstance(result, dict)
 
     def test_mean_geq_min_and_leq_max(self) -> None:
@@ -1346,7 +1346,7 @@ class TestGetScoreAggregatedBySpecies(unittest.TestCase):
             return
         df = _make_linear_df(noise_std=0.01)
         disc = self._make_fitted_disc(df)
-        result = disc.getScoreAggregatedBySpecies(statistic_column="mean")
+        result = disc.getScoreAggregatedBySpecies(accuracy_col="mean")
         self.assertGreaterEqual(result["mean"], result["min"])
         self.assertLessEqual(result["mean"], result["max"])
 
@@ -1356,9 +1356,9 @@ class TestGetScoreAggregatedBySpecies(unittest.TestCase):
             return
         df = _make_linear_df(noise_std=0.01)
         disc = self._make_fitted_disc(df)
-        result = disc.getScoreAggregatedBySpecies(statistic_column="p50")
-        self.assertGreaterEqual(result["median"], result["min"])
-        self.assertLessEqual(result["median"], result["max"])
+        result = disc.getScoreAggregatedBySpecies(accuracy_col="p50")
+        self.assertGreaterEqual(result["p50"], result["min"])
+        self.assertLessEqual(result["p50"], result["max"])
 
     def test_derivative_with_test_df(self) -> None:
         """getScoreAggregatedBySpecies works with derivative score_type and test_df."""
@@ -1378,7 +1378,7 @@ class TestGetScoreAggregatedBySpecies(unittest.TestCase):
         disc.fit()
         result = disc.getScoreAggregatedBySpecies(test_df=test_df, score_type="derivative")
         self.assertIsInstance(result, dict)
-        self.assertEqual(set(result.keys()), {"mean", "min", "max", "median"})
+        self.assertEqual(set(result.keys()), {"mean", "min", "max", "p50"})
 
 
 # ---------------------------------------------------------------------------
