@@ -39,7 +39,7 @@ def run_model(model_name, df, max_changepoint, min_segment_length, max_fractiona
             psd._subsequence_lengths = _lens
             saved_f = psd._is_fitted
             psd._is_fitted = True
-            rec["score_p10"] = float(psd.score(test_df=df))
+            rec["score_p10"] = float(psd.score())
             psd._is_fitted = saved_f
             rec["fit_time_sec"] = time.perf_counter() - t1
             rec["num_changepoints"] = len(cps)

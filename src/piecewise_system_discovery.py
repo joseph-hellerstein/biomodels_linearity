@@ -13,11 +13,11 @@ from src.plot_options import PlotOptions  # type: ignore
 from src.system_discovery import SystemDiscovery, NULL_DF  # type: ignore
 import src.util as util     # type: ignore
 from src.nl_curve import NLCurve  # type: ignore
+from src.score import Score  # type: ignore
 
 import ast
 import collections
 import os
-from dataclasses import dataclass  # noqa: E402 (dataclass used by PiecewiseSystemDiscovery._ScoreSummary)
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
@@ -33,16 +33,6 @@ ChangepointLookupResult = collections.namedtuple("ChangepointLookupResult",
 class PiecewiseSystemDiscovery(object):
     """Piecewise-linear ODE discovery across detected change-points."""
 
-    @dataclass
-    class _ScoreSummary:
-        """Lightweight summary of scores across all subsequences.
-
-        Attributes mirror the column names produced by ``src.score.Score`` so they line up with CSV output.
-        """
-        min: float  # minimum species-level score (accuracy)
-        max: float  # maximum species-level accuracy
-        num_nonzero_term: int  # total number of non-zero ODE terms across all segments and species
-
     def __init__(
         self,
         training_df:  pd.DataFrame,
@@ -52,6 +42,8 @@ class PiecewiseSystemDiscovery(object):
         changepoints: Optional[List[int]] = None,
         is_changepoint_removal: bool = True,
         is_changepoints_from_file: bool = False,
+        accuracy_col: str = cn.DEF_ACCURACY_COL,
+        accuracy_stat: str = cn.DEF_ACCURACY_STAT,
         **sd_kwargs: Any,
     ) -> None:
         """Construct a piecewise-linear ODE discovery pipeline.
@@ -65,12 +57,16 @@ class PiecewiseSystemDiscovery(object):
             changepoints (List[int], optional): List of pre-determined change points. Defaults to None.
             is_changepoint_removal (bool, optional): Whether to allow removal of detected change points. Defaults to True.
             is_changepoints_from_file (bool, optional): Whether to load change points from a CSV file. Defaults to False.
+            accuracy_col (str, optional): Column name for the accuracy metric. Defaults to cn.DEF_ACCURACY_COL.
+            accuracy_stat (str, optional): Statistic for aggregating species accuracies into a model accuracy. Defaults to cn.DEF_ACCURACY_STAT.
             **sd_kwargs: Arguments forwarded to each per-segment ``SystemDiscovery`` constructor.
         """
         self.training_df = training_df
         self.species_names = list(training_df.columns)
         self.num_species = len(self.species_names)
         self.num_point = training_df.shape[0]
+        self.accuracy_col = accuracy_col
+        self.accuracy_stat = accuracy_stat
         if model_id is None:
             self.model_name = ""
             self.model_num = -1
@@ -91,6 +87,13 @@ class PiecewiseSystemDiscovery(object):
         # Baseline (whole-timecourse) SystemDiscovery model, fit lazily so construction stays cheap
         # when ``fit()`` is never invoked.  Accessed via :meth:`_getBaselineSystemDiscovery`.
         self._sys_disc: Optional[SystemDiscovery] = None
+        # Values computed by fit
+        self.baseline_pred_df: Optional[pd.DataFrame] = None  # Predictions for the whole-timecourse baseline model, constructed during ``fit()`` and used in plotting and scoring.
+        self.score_df: Optional[pd.DataFrame] = None  # Score of baseline_pred_df vs. training_df, constructed during ``fit()`` and used by ``score()``.
+        # Per-segment prediction cache used by _scoreFromSegmentList (always predicts
+        # against self.training_df, so caching by (model identity, boundary) is safe).
+        # Reset at the start of each eliminateChangepoints() call.
+        self._predict_cache: dict = {}
 
     @property
     def num_changepoint(self) -> int:
@@ -151,7 +154,6 @@ class PiecewiseSystemDiscovery(object):
 
     def _getChangepointsFromFile(
             self, csv_path: str = cn.PIECEWISE_PREDICTIONS_MODEL_PATH,
-            accuracy_col: str = cn.COL_P50,
     ) -> List[ChangepointLookupResult]:
         """Look up pre-computed changepoints in ``data/piecewise_predictions_model.csv``.
 
@@ -200,7 +202,7 @@ class PiecewiseSystemDiscovery(object):
         results: List[ChangepointLookupResult] = []
         masked_df = df.loc[mask]
         cp_series = masked_df[cn.COL_CHANGEPOINTS]
-        acc_series = masked_df[accuracy_col]
+        acc_series = masked_df[self.accuracy_col]
 
         for i in range(len(masked_df)):
             raw_cp = cp_series.iloc[i]
@@ -284,10 +286,7 @@ class PiecewiseSystemDiscovery(object):
             return []
         return self.eliminateChangepoints(changepoints)
 
-    def eliminateChangepoints(self, changepoints: List[int],
-            col: str = "p10",
-            statistic: str = cn.COL_MEAN,
-            num_estimate: int = 3) -> List[int]:
+    def eliminateChangepoints(self, changepoints: List[int], num_estimate: int = 3) -> List[int]:
         """Eliminates changepoints as long as the estimated reduction in accuracy is less than
         ``max_fractional_reduction`` relative to the baseline (full-changepoint) piecewise fit.
 
@@ -295,10 +294,6 @@ class PiecewiseSystemDiscovery(object):
         ----------
         changepoints : list[int]
             Initial set of changepoint indices to consider for elimination.
-        col: str
-            Column used in calculating statistics
-        statistic: str
-            Statistic used to assess accuracy
         num_estimate: int
             Number of estimates used for calculating accuracy rate
 
@@ -309,12 +304,16 @@ class PiecewiseSystemDiscovery(object):
         """
         self.changepoints = changepoints
         self.fit()
+        # Fresh per elimination round: model objects from a *previous* fit() may have
+        # been dropped (self._subsequence_models reassigned), so their ids could be
+        # reused -- only safe to reuse cache entries within one round.
+        self._predict_cache = {}
 
         # Calculate the accuracy rate
-        accuracy_rate_estimators = [self._estimateAccuracyRate(changepoints, col=col, statistic=statistic)
+        accuracy_rate_estimators = [self._estimateAccuracyRate(changepoints)
                 for _ in range(num_estimate)]
         sorted_estimator_result = sorted(accuracy_rate_estimators, key = lambda x: x.accuracy_rate)
-        idx = (len(accuracy_rate_estimators) + 1)//2
+        idx = (len(accuracy_rate_estimators) - 1)//2
         accuracy_rate_estimate = sorted_estimator_result[idx]
 
         # Find the surviving changepoints
@@ -417,13 +416,14 @@ class PiecewiseSystemDiscovery(object):
         orig_cum_starts = np.cumsum([0] + list(orig_seg_lengths))  # length k+2
 
         def _find_orig_seg_idx(row):
-            """Find which original segment contains the given row index."""
-            if row <= 0:
-                return 0
-            for i in range(len(orig_cum_starts) - 1):
-                if orig_cum_starts[i] <= row < orig_cum_starts[i + 1]:
-                    return i
-            return len(orig_seg_lengths) - 1
+            """Find which original segment contains the given row index.
+
+            Binary search (orig_cum_starts is sorted ascending) instead of a linear
+            scan -- this is called twice per final segment, so a linear scan here
+            made the whole function O(n^2) in the number of original segments.
+            """
+            idx = int(np.searchsorted(orig_cum_starts, max(row, 0), side="right")) - 1
+            return max(idx, 0)
 
         new_models = []
         new_boundaries = []
@@ -442,7 +442,7 @@ class PiecewiseSystemDiscovery(object):
             else:
                 # Multiple segments merged -- need to re-fit on combined data.
                 start_time = (float(time_arr[s_row]) 
-                              if s_row < n_rows else float(time_arr[-1]))
+                        if s_row < n_rows else float(time_arr[-1]))
                 end_time = (float(time_arr[e_row - 1]) 
                             if e_row > 0 and e_row <= n_rows else float(time_arr[-1]))
 
@@ -454,40 +454,37 @@ class PiecewiseSystemDiscovery(object):
 
         return new_models, new_boundaries
 
-    @staticmethod
-    def _calculateAggregatedScore(df : pd.DataFrame, weight_arr : np.ndarray, col=cn.COL_P10, statistic=cn.COL_MEAN) -> float:
-        """Calculate an aggregated score across all segments and species.
+    def _computeScoreDf(self, pred_df: pd.DataFrame) -> pd.DataFrame:
+        """Score a predicted timecourse directly against ``self.training_df``.
 
         Parameters
         ----------
-        df : pd.DataFrame
-            DataFrame containing scores for each segment and species.
-        weights : np.ndarray
-            Weights for each segment, typically the segment lengths.
-        col : str
-            Column name in df to aggregate (e.g., ``cn.COL_P10``).
-        statistic : str
-            Aggregation: ``'min'``, ``'mean'``.
+        pred_df : pd.DataFrame
+            Predicted timecourse, same shape/index as (a subset of) ``self.training_df``.
 
         Returns
         -------
-        float
-            Aggregated score across all segments and species.
+        pd.DataFrame
+            ``Score.score_df``: one row per species plus one ``"model"`` aggregation row
+            (see ``cn.COL_AGGREGATION_TYPE``), with columns for every statistic in
+            ``cn.COLUMN_STATISTICS`` (mean, min, max, p05...p99, etc.).
         """
-        if statistic == cn.COL_MIN:
-            return float(df[col].min())
-        elif statistic == cn.COL_MEAN:
-            # Calculate the weighted mean of the scores
-            mask = df[cn.COL_AGGREGATION_TYPE] == cn.COL_AGGREGATION_TYPE_MODEL
-            model_score_df = df[mask]
-            result = float(np.sum(model_score_df[col].to_numpy() * weight_arr) / np.sum(weight_arr))
-            return result
-        else:
-            raise ValueError(f"Unknown statistic: {statistic}")
+        score = Score(accuracy_col=self.accuracy_col)
+        score.add(self.training_df, pred_df, system_id=self.model_name)
+        return score.score_df
 
-    def _scoreFromSegmentList(self, models, boundaries, col=cn.COL_P10, statistic=cn.COL_MEAN) -> float:
-        """Score an arbitrary list of (model, boundary) pairs using the same aggregation 
-        as :meth:`PiecewiseSystemDiscovery.score`.
+    def _readScore(self, score_df: pd.DataFrame) -> float:
+        """Read ``self.accuracy_stat`` off the ``"model"`` aggregation row of *score_df*."""
+        if self.accuracy_stat not in score_df.columns:
+            raise ValueError(f"Unknown statistic: {self.accuracy_stat}")
+        mask = score_df[cn.COL_AGGREGATION_TYPE] == cn.COL_AGGREGATION_TYPE_MODEL
+        return float(score_df.loc[mask, self.accuracy_stat].iloc[0])
+
+    def _scoreFromSegmentList(self, models, boundaries) -> float:
+        """Score an arbitrary list of (model, boundary) pairs using the same aggregation
+        as :meth:`PiecewiseSystemDiscovery.score`: stitch each segment's prediction into a
+        single whole-timecourse prediction and compare it directly against
+        ``self.training_df``.
 
         Parameters
         ----------
@@ -495,33 +492,47 @@ class PiecewiseSystemDiscovery(object):
             Fitted SystemDiscovery models for each segment.
         boundaries : list[tuple[float, float]]
             Start/end times for each segment.
-        col : str
-            Score column name (e.g., ``cn.COL_P10``).
-        statistic : str
-            Aggregation: ``'min'``, ``'mean'``.
 
         Returns
         -------
         float
             Aggregated score across all segments and species.
         """
-        score_dfs = []
-        segment_lengths = []
-        for model, (start, end) in zip(models, boundaries):
-            test_seg_df = self.training_df.iloc[
-                (self.training_df.index >= start) & 
-                (self.training_df.index <= end)]
-            score_info = model.getScoreDetails(
-                test_df=test_seg_df, score_type="timecourse")
-            score_dfs.append(score_info)
-            segment_lengths.append(end-start)
-        if not score_dfs:
-            raise RuntimeError("No segments to score.")
-        #
-        segment_length_arr = np.array(segment_lengths)
-        combined_df = pd.concat(score_dfs, ignore_index=True)
-        #
-        return self._calculateAggregatedScore(combined_df, segment_length_arr, col=col, statistic=statistic)
+        pred_df = self._stitchPredictionsCached(models, boundaries)
+        score_df = self._computeScoreDf(pred_df)
+        return self._readScore(score_df)
+
+    def _stitchPredictionsCached(self,
+            models: List[SystemDiscovery],
+            boundaries: List[Tuple[float, float]]) -> pd.DataFrame:
+        """Like :meth:`_stitchPredictions`, but caches each segment's prediction
+        keyed by ``(id(model), t_start, t_end)``.
+
+        Only safe because this is always called against ``self.training_df`` (never
+        an arbitrary ``test_df``, unlike :meth:`predict`) -- the same (model, boundary)
+        pair always yields the same prediction. ``_buildTrialSegments`` reuses model
+        objects from ``self._subsequence_models`` across repeated trial-removal calls
+        within one ``eliminateChangepoints()`` round, so most segments hit this cache
+        instead of re-integrating the ODE.
+        """
+        pred_frames: List[pd.DataFrame] = []
+        for seg_model, (t_start, t_end) in zip(models, boundaries):
+            key = (id(seg_model), t_start, t_end)
+            cached = self._predict_cache.get(key)
+            if cached is None:
+                test_seg_df = self.training_df[
+                    (self.training_df.index >= t_start) & (self.training_df.index <= t_end)]
+                cached = seg_model.predict(test_df=test_seg_df)
+                self._predict_cache[key] = cached
+            pred_df = cached
+            if t_start > 0:
+                pred_df = pred_df[pred_df.index > t_start]
+            pred_frames.append(pred_df)
+        full_pred_df = pd.concat(pred_frames)
+        if full_pred_df.index.duplicated().any():
+            raise RuntimeError(
+                "Duplicate rows in prediction result.  This should not happen.")
+        return full_pred_df
 
     EstimatorResult = collections.namedtuple("EstimatorResult",
             ["accuracy_rate", "total_frob_dist", "delta_accuracy", "num_candidate",
@@ -535,7 +546,6 @@ class PiecewiseSystemDiscovery(object):
     def _estimateAccuracyRate(
             self,
             changepoints: List[int],
-            statistic: str = cn.COL_MEAN, col: str = cn.COL_P10,
             num_estimation_changepoint: int =10,
             max_frac_frob_dist: float = 0.1) -> EstimatorResult:
         """Estimate the accuracy_rate, the reduction in accuracy per Frobenius Jacobian difference.
@@ -553,10 +563,6 @@ class PiecewiseSystemDiscovery(object):
         ----------
         changepoints: List[int]
             Changepoints to consider
-        statistic : str
-            Statistic for scoring: ``'min'``, ``'mean'``.  Defaults to ``"min"``.
-        col : str
-            Score column name, e.g., ``cn.COL_P10`` (default).
         num_estimation_changepoint: int
             Number of changepoints used to estimate accuracy rate
         max_frac_frob_dist: float
@@ -603,7 +609,7 @@ class PiecewiseSystemDiscovery(object):
             frob_dist_arr = frob_dist_arr/total_frob_dist
 
         # Compute baseline (piecewise) score across all segments.
-        base_score = float(self.score(col=col, statistic=statistic))
+        base_score = self.score()
 
         # Randomly select which changepoints to use in estimation (positional indices).
         # The removed changepoints are the complement: those present in self but absent in trial_psd.
@@ -627,8 +633,7 @@ class PiecewiseSystemDiscovery(object):
         # segments reuse existing fitted models from self to avoid O(k) re-fits.
         try:
             trial_models, trial_boundaries = self._buildTrialSegments(remove_idx_arr)
-            adjusted_score = self._scoreFromSegmentList(
-                trial_models, trial_boundaries, col=col, statistic=statistic)
+            adjusted_score = self._scoreFromSegmentList(trial_models, trial_boundaries)
         except Exception as e:
             raise ValueError(
                 f"Cannot estimate reduction in accuracy for {self.model_name}: {e}") from e
@@ -657,7 +662,7 @@ class PiecewiseSystemDiscovery(object):
         else:
             return self.max_changepoint
 
-    def fit(self, col_accuracy: str = "p50", min_accuracy: float = 0.0) -> 'PiecewiseSystemDiscovery':
+    def fit(self,  min_accuracy: float = 0.0) -> 'PiecewiseSystemDiscovery':
         """Detect change points and fit a ``SystemDiscovery`` model to each segment.
 
         After this call, :attr:`_subsequence_models`, :attr:`_subsequence_boundaries`,
@@ -666,8 +671,6 @@ class PiecewiseSystemDiscovery(object):
 
         Parameters
         ----------
-        col_accuracy : str, optional
-            Column name for the accuracy metric used to select changepoints from a CSV file. Defaults  
         min_accuracy : float, optional
             Minimum accuracy required for a changepoint to be considered valid. Defaults to 0.80.
         """
@@ -675,7 +678,7 @@ class PiecewiseSystemDiscovery(object):
             df = util.getPSDPredictionDF(max_fractional_reduction=self.max_fractional_reduction)
             mask = df[cn.COL_SYSTEM_ID] == self.model_name
             mask &= df[cn.COL_AGGREGATION_TYPE] == cn.COL_AGGREGATION_TYPE_MODEL
-            mask &= df[col_accuracy] >= min_accuracy
+            mask &= df[self.accuracy_col] >= min_accuracy
             if mask.any():
                 dff = df[mask]
                 # Try to use auc column if it exists, otherwise fall back to num_changepoint
@@ -700,6 +703,9 @@ class PiecewiseSystemDiscovery(object):
         (self._subsequence_models, self._subsequence_boundaries,
         self._subsequence_lengths) = self._fitSegments(cast(List[int], self.changepoints))
         self._is_fitted = True
+        # Cache the whole-timecourse piecewise prediction for reuse in scoring/plotting.
+        self.baseline_pred_df = self.predict(test_df=self.training_df)
+        self.score_df = self._computeScoreDf(self.baseline_pred_df)
         return self
 
     def predict(self, test_df: Optional[pd.DataFrame] = NULL_DF) -> pd.DataFrame:
@@ -731,11 +737,30 @@ class PiecewiseSystemDiscovery(object):
             self._checkColumns(list(test_df.columns))
             self._checkTimegGrid(test_df.index.to_numpy(dtype=float))
         test_df = cast(pd.DataFrame, test_df)
+        return self._stitchPredictions(self._subsequence_models, self._subsequence_boundaries, test_df)
 
-        # Integrate each segment with its own fitted SystemDiscovery model.
+    def _stitchPredictions(self,
+            models: List[SystemDiscovery],
+            boundaries: List[Tuple[float, float]],
+            test_df: pd.DataFrame) -> pd.DataFrame:
+        """Integrate each segment with its own fitted ``SystemDiscovery`` model and concatenate.
+
+        Parameters
+        ----------
+        models : list[SystemDiscovery]
+            Fitted SystemDiscovery models for each segment.
+        boundaries : list[tuple[float, float]]
+            Start/end times for each segment.
+        test_df : pd.DataFrame
+            Full timecourse (initial conditions and time grid) to predict over.
+
+        Returns
+        -------
+        pd.DataFrame
+            Predicted concentrations with one column per species; time as the index.
+        """
         pred_frames: List[pd.DataFrame] = []
-        for seg_model, (t_start, t_end) in zip(
-                    self._subsequence_models, self._subsequence_boundaries):
+        for seg_model, (t_start, t_end) in zip(models, boundaries):
             test_seg_df = test_df[(test_df.index >= t_start) & (test_df.index <= t_end)]
             pred_df = seg_model.predict(test_df=test_seg_df)
             if t_start > 0:
@@ -800,7 +825,7 @@ class PiecewiseSystemDiscovery(object):
                 species_names: Optional[List[str]] = None,
                 is_nochangepoint_plot: bool = True,
                 is_changepoint_plot: bool = True,
-                statistic: str = cn.COL_MEAN,
+                title_additional: str = "",
                 **plt_kwargs: Any) -> PlotOptions:
         """Two-panel comparison: 0 change points (top) vs max_changepoint (bottom).
 
@@ -820,8 +845,6 @@ class PiecewiseSystemDiscovery(object):
             Plot with no changepoints
         is_changepoint_plot: bool
             Plot with changepoints
-        statistic: str
-            Statistic to use for scoring the piecewise model.  Defaults to "mean".
 
         **plt_kwargs
             Forwarded to PlotOptions. Supported keys: fig, ax, title, xlabel,
@@ -847,10 +870,9 @@ class PiecewiseSystemDiscovery(object):
 
         # Get baseline vs. piecewise scores and predictions; lazily build the whole-timecourse model.
         sys_disc = self._getBaselineSystemDiscovery()
-        baseline_score = sys_disc.score(statistic=statistic, col=cn.COL_P10)
-        baseline_pred_df = sys_disc.predict()
-        psd_score = self.score(statistic=statistic, col=cn.COL_P10)
-        psd_pred_df = self.predict()
+        sys_disc_score = sys_disc.score()
+        sys_disc_pred_df = sys_disc.predict()
+        psd_score = self.score()
         # Construct the plot
         if is_nochangepoint_plot and is_changepoint_plot:
             fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=figsize, sharex=True)
@@ -898,17 +920,21 @@ class PiecewiseSystemDiscovery(object):
                 auc_title = f", AUC={auc:.3f}"
             else:
                 auc_title = ""
-            po.title = model_num_str + ": " + plt_options.get("title", "") + f" ({statistic} species p10 accuracy={score:.3f}{auc_title})"
+            po.title = model_num_str + ": " + plt_options.get("title", "") + f" ({self.accuracy_stat} species p10 accuracy={score:.3f}{auc_title}"
+            if len(title_additional) > 0:
+                po.title += f", {title_additional})" # type: ignore
+            else:
+                po.title += ")" # type: ignore
             if ymax > 0.0:
                 po.ylim = (0.0, ymax)
             po.apply()
             ax.legend(legends)  # type: ignore
         ##
         if is_nochangepoint_plot:
-            _draw(fig=fig, ax=ax_top, pred_df=baseline_pred_df, score=baseline_score,  # type: ignore
+            _draw(fig=fig, ax=ax_top, pred_df=sys_disc_pred_df, score=sys_disc_score,  # type: ignore
                     title="0 change points", **plt_kwargs)
         if is_changepoint_plot:
-            _draw(fig=fig, ax=ax_bot, pred_df=psd_pred_df, score=psd_score,  # type: ignore
+            _draw(fig=fig, ax=ax_bot, pred_df=self.baseline_pred_df, score=psd_score,  # type: ignore
                     title=f"{self.num_changepoint} change points",
                     vlines=change_point_times,
                     auc=self.nl_curve.auc, **plt_kwargs)
@@ -921,13 +947,14 @@ class PiecewiseSystemDiscovery(object):
         self._requireFitted()
         print(str(self))
 
-    def score(self, test_df: Optional[pd.DataFrame] = None, score_type="timecourse",
-            col: str = cn.COL_P10, statistic: str = cn.COL_MEAN) -> float:
-        """Return the average score across all subsequences.
-        statistic:
-            min, mean
+    def score(self) -> float:
+        """Return the aggregated score for the fitted piecewise model.
+
+        Reads ``self.accuracy_stat`` off ``self.score_df`` (computed in ``fit()`` by
+        scoring ``self.baseline_pred_df`` directly against ``self.training_df``). Uses
+        the same aggregation as :meth:`_scoreFromSegmentList` so that scores computed
+        for the fitted piecewise model and for trial (candidate) segmentations are
+        directly comparable.
         """
         self._requireFitted()
-        score_df = self.getScoreDetails(test_df=test_df, score_type=score_type)
-        return self._calculateAggregatedScore(score_df, 
-                np.array(self._subsequence_lengths), col=col, statistic=statistic)
+        return self._readScore(cast(pd.DataFrame, self.score_df))

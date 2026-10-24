@@ -1,6 +1,7 @@
 # TO DO
 
 1. Many models show graphs that seem at odds with the accuracy displayed for model p50.  Examples are 904, 875, and 750. Debug this.
+2. PSDPredictionAnalyzer.best_model_ser doesn't look correct from plot in @psd_prediction_analysis since model 5 has a strange number of changepoints for max_fractional_reduction = 0.05 (manycp=True).
 
 # Analyses
 1. Consistency of changepoint and AUC across replications

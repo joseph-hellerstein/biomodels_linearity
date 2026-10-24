@@ -61,7 +61,6 @@ COL_MODEL_NAME = "model_name"
 COL_ENDTIME_SOURCE = "end_time_source"  # How end_time was determined (e.g. "reciprocal_min_eigenvalue", "default")
 COL_INVALID_COUNT = "invalid_count"  # Number of invalid (sentinel -1) values excluded from aggregation.
 COL_MAX_CHANGEPOINT = "max_changepoint"
-COL_MEAN = "mean"  # Mean value of the valid values used in calculating the statistics.
 COL_NUM_CHANGEPOINT = "num_changepoint"
 COL_MAX_FRACTIONAL_REDUCTION = "max_fractional_reduction"
 COL_NUM_REACTION = "num_reaction"
@@ -131,3 +130,7 @@ PERTURBATION_SPECIES_FRACTION = 0.5  # Perturb this fraction of points
 # Endtime fraction
 ENDTIME_FRACTION_STEADYSTATE = 0.1  # Fraction of endtime to use for timecourse analysis
 ENDTIME_FRACTION_MAXMEDIAN = 0.1  # Fraction of endtime to use for timecourse analysis
+
+# Default values
+DEF_ACCURACY_COL = COL_P10
+DEF_ACCURACY_STAT = COL_P50

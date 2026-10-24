@@ -70,7 +70,7 @@ class PSDPredictionAnalyzer:
         filtered_df = PSDPredictionFileIterator.query(is_guard_filename=self.is_guard_filename,
                 dataframe_filter=self._filterDataframe, data_dir=self.data_dir, is_pkl= True)
         #
-        return filtered_df
+        return filtered_df.reset_index()
 
     def _getModelBestSer(self) -> "pd.Series | None":
         """Gets the best series for the model based on the optimization criteria:

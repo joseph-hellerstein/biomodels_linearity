@@ -27,8 +27,8 @@ class Score:
     """
     SERIALIZATION_PATH = "score.csv"  # Default path for persistence, can be overridden in subclasses.
 
-    def __init__(self, serialization_path: Optional[str] = None, is_persist: bool = True,
-            col_percentile: str = cn.COL_P10) -> None:
+    def __init__(self, serialization_path: Optional[str] = None, is_persist: bool = False,
+            accuracy_col: str = cn.DEF_ACCURACY_COL) -> None:
         """
         Parameters
         ----------
@@ -36,14 +36,14 @@ class Score:
             Path to a CSV file for persistence.
         is_persist : bool
             Whether to persist the DataFrame to the CSV file.
-        col_percentile : str
-            The percentile to compute (e.g., 'p10', 'p50', 'p90'). Default is 'p10'.
+        accuracy_col : str
+            The column to use for accuracy calculations (e.g., 'p10', 'p50', 'p90'). Default is 'p10'.
         """
-        self._is_persist = is_persist
         if serialization_path is None:
             serialization_path = self.SERIALIZATION_PATH
+        self._is_persist = is_persist
         self._serialization_path = serialization_path
-        self._col_percentile = col_percentile
+        self._col_percentile = accuracy_col
         #
         self.score_df = pd.DataFrame()
 
@@ -111,7 +111,7 @@ class Score:
 
     @classmethod
     def calculateAccuracyPercentile(cls, true_df: pd.DataFrame, prediction_df: pd.DataFrame,
-            col_percentile: str=cn.COL_P10) -> pd.Series:
+            accuracy_col: str=cn.DEF_ACCURACY_COL) -> pd.Series:
         """
         Calculates the percentile of Accuracy values for each species across all timepoints.
 
@@ -121,8 +121,8 @@ class Score:
             True timecourse with timepoints as index and species as columns.
         prediction_df : pd.DataFrame
             Prediction timecourse with the same structure as true_df.
-        col_percentile : str
-            The percentile to compute (e.g., 'p10', 'p50', 'p90'). Default is 'p10'.
+        accuracy_col : str
+            The column to use for accuracy calculations (e.g., 'p10', 'p50', 'p90'). Default is 'p10'.
 
         Returns
         -------
@@ -133,38 +133,9 @@ class Score:
         calculator = StatisticCalculator()
         for species_name in accuracy_df.columns:
             calculator.add(species_name, accuracy_df[species_name].to_numpy())
-        ser = calculator.dataframe[col_percentile]
+        ser = calculator.dataframe[accuracy_col]
         ser.index = accuracy_df.columns
         return ser
-    
-    @classmethod
-    def calculateModelAccuracy(cls, true_df: pd.DataFrame, prediction_df: pd.DataFrame,
-            col_percentile: str=cn.COL_P10) -> float:
-        """
-        Calculates the model-level accuracy as the p-th percentile of per-species p-th-percentile accuracies.
-
-        This double-percentile aggregation yields a conservative summary: first, for each species we
-        compute the p-th percentile across all timepoints (capturing its best-performing fraction), and
-        then we take the p-th percentile across species (capturing the performance level exceeded by that
-        fraction of species).
-
-        Parameters
-        ----------
-        true_df : pd.DataFrame
-            True timecourse with timepoints as index and species as columns.
-        prediction_df : pd.DataFrame
-            Prediction timecourse with the same structure as true_df.
-        col_percentile : str
-            The percentile to compute (e.g., 'p10', 'p50', 'p90'). Default is 'p10'.
-
-        Returns
-        -------
-        float
-            The p-th percentile of per-species p-th-percentile accuracy values.
-        """
-        accuracy_ser = cls.calculateAccuracyPercentile(true_df, prediction_df, col_percentile)
-        percentile = StatisticCalculator.extractPercentile(col_percentile)
-        return accuracy_ser.quantile(q=percentile / 100)
 
     def add(self,
             true_timecourse_df: pd.DataFrame,
@@ -206,7 +177,7 @@ class Score:
         statistic_calculator = StatisticCalculator()
         # Calculate model-level aggregation (across all species and timepoints)
         model_accuracy_ser = self.calculateAccuracyPercentile(true_timecourse_df, prediction_timecourse_df,
-                col_percentile=self._col_percentile)
+                accuracy_col=self._col_percentile)
         statistic_calculator.add(cn.COL_AGGREGATION_TYPE_MODEL, model_accuracy_ser.to_numpy())
         # Species level aggregations (one per species column, across all timepoints)
         accuracy_df: pd.DataFrame = self.calculateTimeseriesAccuracies(true_timecourse_df, prediction_timecourse_df)
