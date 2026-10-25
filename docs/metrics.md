@@ -50,7 +50,7 @@ So, $\alpha^{\prime} > \alpha$.
 
 ### Bounds on AUC
 
-Given $M$ segments that sum to $T$, we can construct a lower and upper bound for $\alpha$.
+We construct two sets of $M$ segments that will yield $\alpha_L$, the AUC lower bound, and $alpha_H$, the AUC upper bound.
 
 For the upper bound, $s_i = \frac{1}{M}$ and so 
 $$
@@ -65,3 +65,15 @@ $$
 lim_{M \rightarrow \infty} \alpha_L = (M -1) s^* (1 - s^*) + (1 - (M -1) s^*)(M -1) s^*
 = 0
 $$
+
+We begin with Claim 1: If we are given $M$ segments ${\bf s}$, then 
+$$
+\alpha_L \leq \alpha_{\bf s} \leq \alpha_{H}
+$$
+The proof is that for $0 \leq s_1 < s_2 \leq \frac{1}{2}$,
+$s_1 (1- s_1) < s_2 (1 - s_2)$, which is clear from the concave curve. So, the sum of these terms establishes the claim.
+
+Now we prove the lower bound. We convert ${\bf s}$ to ${\bf s}^{\prime}$ by having $s^{\prime}_i = min(s, 1-s)$. Note that $\alpha_{\bf s} = \alpha_{{\bf s}^{\prime}}$.
+Also, $s_{Li} \leq s^{\prime}_i$.
+
+The upper bound is proved in a similar way. Clearly, $s^{\prime}_i \leq s_{Hi}$, and so the conclusion follows.
