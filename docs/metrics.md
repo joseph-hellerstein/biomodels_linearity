@@ -76,4 +76,15 @@ $s_1 (1- s_1) < s_2 (1 - s_2)$, which is clear from the concave curve. So, the s
 Now we prove the lower bound. We convert ${\bf s}$ to ${\bf s}^{\prime}$ by having $s^{\prime}_i = min(s, 1-s)$. Note that $\alpha_{\bf s} = \alpha_{{\bf s}^{\prime}}$.
 Also, $s_{Li} \leq s^{\prime}_i$.
 
-The upper bound is proved in a similar way. Clearly, $s^{\prime}_i \leq s_{Hi}$, and so the conclusion follows.
+For the upper bound, we use the method of LaGrange Multipliers.
+$f ({\bf s}) = \sum_i s_i (1 - s_i)$ with the constraint that
+$g({\bf s} ) = \sum s_i = 1$ for $0 \leq s_i \leq 1$.
+The solution is obtained from the proportionality of the gradients.
+That is, $\nabla f = \lambda \nabla g$. Or,
+$$
+1 - 2 s_i = \lambda \equiv s_i = \frac{1 - \lambda}{2}
+$$
+From the constraint, we know that $M \frac{1 - \lambda}{2} = 1$ and so
+$\lambda = 1 - \frac{2}{M}$.
+So, we conclude that $s_i = \frac{1}{M},$
+which is ${\bf s}_H$.
