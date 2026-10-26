@@ -25,6 +25,7 @@ import ast
 import src.constants as cn  # noqa: E402
 import src.util as util  # type: ignore
 from src.nl_curve import NLCurve # type: ignore
+from src.piecewise_system_discovery import PiecewiseSystemDiscovery  # type: ignore
 from src.psd_prediction_file_iterator import PSDPredictionFileIterator, PSDPredictionItem  # type: ignore
 
 import argparse
@@ -98,12 +99,10 @@ def _addBoundariesColumn(item: PSDPredictionItem) -> int:
         pass
     boundaries_list = []
     for _, row in df.iterrows():
-        changepoints = row[cn.COL_CHANGEPOINTS]
-        if isinstance(changepoints, str):
-            raise ValueError(f"Expected a list of changepoints, got {type(changepoints)}")
-        boundaries = [0] + sorted(changepoints) + [item.num_point - 1]
+        changepoints = PiecewiseSystemDiscovery.parseChangepointsCell(row[cn.COL_CHANGEPOINTS], model_name=row[cn.COL_SYSTEM_ID])
+        boundaries = [0] + sorted(changepoints) + [item.num_point - 1]  # type: ignore
         if not isinstance(boundaries[0], (int, float)):
-            raise ValueError(f"Expected a list of integers or floats for changepoints, got {type(changepoints[0])}")
+            raise ValueError(f"Expected a list of integers or floats for changepoints.")
         boundaries_list.append(boundaries)
     df[cn.COL_BOUNDARIES] = boundaries_list
     return len(df)

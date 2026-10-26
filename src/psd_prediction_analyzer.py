@@ -10,16 +10,12 @@ import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 from typing import Union
 
-DEFAULT_MAX_CHANGEPOINT = 5000
-DEFAULT_MIN_ACCURACY = 0.8
-DEFAULT_ACCURACY_STATISTIC = cn.COL_MEAN
-
 
 class PSDPredictionAnalyzer:
 
     def __init__(self, model_id: Union[str, int],
-            min_accuracy : float = DEFAULT_MIN_ACCURACY,
-            accuracy_statistic: str = DEFAULT_ACCURACY_STATISTIC,
+            min_accuracy : float = cn.DEF_MIN_ACCURACY,
+            accuracy_statistic: str = cn.DEF_ACCURACY_STAT,
             is_guard_filename: bool = True,
             timecourse_df: pd.DataFrame | None = None,
             data_dir: str = cn.PSD_DATA_DIR) -> None:
@@ -54,7 +50,7 @@ class PSDPredictionAnalyzer:
         """
         try:
             mask = df[cn.COL_AGGREGATION_TYPE] == cn.COL_AGGREGATION_TYPE_MODEL
-            mask &= df[cn.COL_MAX_CHANGEPOINT] == DEFAULT_MAX_CHANGEPOINT
+            mask &= df[cn.COL_MAX_CHANGEPOINT] == cn.DEF_MAX_CHANGEPOINT
             mask &= df[cn.COL_SYSTEM_ID] == self.model_name
             result_df = df[mask]
             return result_df
@@ -127,8 +123,8 @@ class PSDPredictionAnalyzer:
     @classmethod
     def plotBestLinearFits(cls,
             model_ids: list[Union[str, int]],
-            min_accuracy: float = DEFAULT_MIN_ACCURACY,
-            accuracy_statistic: str = DEFAULT_ACCURACY_STATISTIC,
+            min_accuracy: float = cn.DEF_MIN_ACCURACY,
+            accuracy_statistic: str = cn.DEF_ACCURACY_STAT,
             is_guard_filename: bool = True,
             data_dir: str = cn.PSD_DATA_DIR) -> None:
         """

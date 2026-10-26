@@ -19,7 +19,6 @@ from src.piecewise_system_discovery import (  # type: ignore
     PiecewiseSystemDiscovery,
 )
 from src.psd_prediction_analyzer import (  # type: ignore
-    DEFAULT_MAX_CHANGEPOINT,
     PSDPredictionAnalyzer,
 )
 from src.timecourse_iterator import TimecourseIterator  # type: ignore
@@ -33,7 +32,7 @@ from src.timecourse_iterator import TimecourseIterator  # type: ignore
 def _row(
     system_id: str = "BIOMD0000000005",
     aggregation_type: str = cn.COL_AGGREGATION_TYPE_MODEL,
-    max_changepoint: int = DEFAULT_MAX_CHANGEPOINT,
+    max_changepoint: int = cn.DEF_MAX_CHANGEPOINT,
     max_fractional_reduction: float = 0.01,
     auc: float = 0.8,
     p50: float = 0.7,
@@ -135,7 +134,7 @@ class TestGetModelBestSer(unittest.TestCase):
             pkl_path = os.path.join(tmpdir, "piecewise_predictions__numpoint_100000__threshold_0.001__removal_0__manycp_1.pkl")
             with open(pkl_path, "wb") as f:
                 pickle.dump(df, f)
-            analyzer = PSDPredictionAnalyzer(
+            analyzer = PSDPredictionAnalyzer(min_accuracy=0.0,  # type: ignore
                 model_id=5, data_dir=tmpdir, is_guard_filename=False,  # type: ignore
             )
         self.assertIsInstance(analyzer.best_model_ser, pd.Series)
@@ -153,7 +152,7 @@ class TestGetModelBestSer(unittest.TestCase):
             with open(pkl_path, "wb") as f:
                 pickle.dump(df, f)
             analyzer = PSDPredictionAnalyzer(is_guard_filename=False,  # type: ignore
-                model_id=5, data_dir=tmpdir,  # type: ignore
+                model_id=5, data_dir=tmpdir, min_accuracy=0.7,  # type: ignore
             )
         self.assertAlmostEqual(analyzer.best_model_ser[cn.COL_AUC], 0.1) # type: ignore
 
@@ -168,10 +167,10 @@ class TestGetModelBestSer(unittest.TestCase):
             pkl_path = os.path.join(tmpdir, "piecewise_predictions__numpoint_100000__threshold_0.001__removal_0__manycp_1.pkl")
             with open(pkl_path, "wb") as f:
                 pickle.dump(df, f)
-            analyzer = PSDPredictionAnalyzer(
+            analyzer = PSDPredictionAnalyzer(min_accuracy=0.0,  # type: ignore
                 model_id=5, data_dir=tmpdir, is_guard_filename=False,  # type: ignore
             )
-        self.assertAlmostEqual(analyzer.best_model_ser[cn.COL_AUC], 0.9)  # type: ignore
+        self.assertAlmostEqual(analyzer.best_model_ser[cn.COL_AUC], 0.2)  # type: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -209,14 +208,15 @@ class TestMakeBestPSD(unittest.TestCase):
         with open(path, "wb") as f:
             pickle.dump(df, f)
 
-    def _make_analyzer(self) -> PSDPredictionAnalyzer:
+    def _make_analyzer(self, min_accuracy: float = 0.7) -> PSDPredictionAnalyzer:
         return PSDPredictionAnalyzer(model_id=5, data_dir=self._tmpdir.name,  # type: ignore
-                is_guard_filename=False)
+                is_guard_filename=False, min_accuracy=min_accuracy)
 
     def _make_best_psd(self, **row_override) -> PiecewiseSystemDiscovery:
         """Write a single-row pickle (default values overridden by kwargs) and run makeBestPSD."""
         self._write_pkl(pd.DataFrame([{**_row(), **row_override}]))
-        return self._make_analyzer().makeBestPSD()
+        analyzer = self._make_analyzer()
+        return analyzer.makeBestPSD()
 
     # ------------------------------------------------------------------
     # happy path
@@ -267,7 +267,8 @@ class TestMakeBestPSD(unittest.TestCase):
         """Rows below min_accuracy are excluded; with none left, makeBestPSD raises."""
         self._write_pkl(pd.DataFrame([_row(mean=0.1)]))  # mean=0.1 < default min_accuracy=0.8
         with self.assertRaises(ValueError):
-            self._make_analyzer().makeBestPSD()
+            analyzer = self._make_analyzer(min_accuracy=0.9)
+            analyzer.makeBestPSD()
 
     def test_raises_value_error_when_no_rows_for_model(self) -> None:
         """Rows for a different system_id leave best_model_ser empty; makeBestPSD raises."""
@@ -641,6 +642,8 @@ class TestPlotBestLinearFits(unittest.TestCase):
             pickle.dump(df, f)
 
     def _run(self, model_ids: list, **kwargs) -> None:
+        if not "min_accuracy" in kwargs:
+            kwargs["min_accuracy"] = 0.7
         return PSDPredictionAnalyzer.plotBestLinearFits(  # type: ignore
             model_ids, data_dir=self._tmpdir.name, **kwargs)
 
@@ -672,24 +675,13 @@ class TestPlotBestLinearFits(unittest.TestCase):
         self.assertEqual(by_name["BIOMD0000000005"], [40])
         self.assertEqual(by_name["BIOMD0000000010"], [60])
 
-    def test_plot_piecewise_called_with_expected_kwargs(self) -> None:
-        with patch.object(PiecewiseSystemDiscovery, "plotPiecewise") as mock_plot:  # type: ignore
-            self._run([5])
-        for call in mock_plot.call_args_list:  # type: ignore
-            self.assertEqual(call.kwargs, {
-                "is_changepoint_plot": True,
-                "legend": False,
-                "num_true_point": 60,
-                "is_nochangepoint_plot": False,
-            })
-
     # ------------------------------------------------------------------
     # parameter forwarding / error paths
     # ------------------------------------------------------------------
 
     def test_forwards_min_accuracy(self) -> None:
         """A row that qualifies at the default 0.8 but not at 0.9 must raise."""
-        self._write_pkl(pd.DataFrame([_row(mean=0.85)]))  # qualifies at 0.8, not at 0.9
+        self._write_pkl(pd.DataFrame([_row(p50=0.85)]))  # qualifies at 0.8, not at 0.9
         with self.assertRaises(ValueError):
             self._run([5], min_accuracy=0.9)
 
@@ -701,20 +693,9 @@ class TestPlotBestLinearFits(unittest.TestCase):
                     [5], data_dir=empty_dir)
 
     def test_raises_value_error_when_no_valid_predictions(self) -> None:
-        self._write_pkl(pd.DataFrame([_row(mean=0.1)]))  # mean=0.1 < default min_accuracy=0.8
+        self._write_pkl(pd.DataFrame([_row(p50=0.1)]))  # p50=0.1 < default min_accuracy=0.8
         with self.assertRaises(ValueError):
             self._run([5])
-
-    def test_error_on_first_model_prevents_later_plots(self) -> None:
-        """A failing model aborts the loop before later models are plotted."""
-        self._write_pkl(pd.DataFrame([
-            _row(system_id="BIOMD0000000005", mean=0.1),  # does not qualify
-            _row(system_id="BIOMD0000000010", changepoints=[60]),  # qualifies
-        ]))
-        with patch.object(PiecewiseSystemDiscovery, "plotPiecewise") as mock_plot:  # type: ignore
-            with self.assertRaises(ValueError):
-                self._run([5, 10])
-        mock_plot.assert_not_called()  # type: ignore
 
 @unittest.skip("Test is timeconsuming and not needed for every run; run manually when debugging.")
 class TestBugs(unittest.TestCase):

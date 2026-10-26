@@ -134,3 +134,5 @@ ENDTIME_FRACTION_MAXMEDIAN = 0.1  # Fraction of endtime to use for timecourse an
 # Default values
 DEF_ACCURACY_COL = COL_P10
 DEF_ACCURACY_STAT = COL_P50
+DEF_MIN_ACCURACY = 0.8
+DEF_MAX_CHANGEPOINT = 5000

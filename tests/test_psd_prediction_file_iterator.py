@@ -14,8 +14,7 @@ from unittest.mock import patch
 import pandas as pd  # type: ignore
 
 import src.constants as cn  # type: ignore
-from psd_prediction_file_iterator import PSDPredictionFileIterator, PSDPredictionItem
-import psd_prediction_file_iterator as psd_iter  # type: ignore
+from psd_prediction_file_iterator import PSDPredictionFileIterator, PSDPredictionItem # type: ignore
 import src.util as util  # type: ignore
 
 _HAS_PSD_DATA = os.path.isdir(cn.PSD_DATA_DIR)
@@ -258,7 +257,7 @@ class TestEndToEndBioIterator(unittest.TestCase):
         dff = pd.DataFrame({col: df[col]})
         return dff
 
-    @unittest.skip("Temporary skip for missing file")
+    @unittest.skipUnless(_HAS_PSD_DATA, "PSD data directory not found; skipping test.")
     def test_files_found_in_psd_data_dir(self) -> None:
         """Check that the PSD data directory contains files for iteration."""
         df = PSDPredictionFileIterator.query(dataframe_filter=self.dataframe_filter)

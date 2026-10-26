@@ -10,17 +10,11 @@ The **segment curve** is a function $\psi (s)$, where $s$ is the segment size.
 $\psi (s)$ is the fraction of the timecourse that has a segment size $\leq s$.
 Let $\alpha$ denote the **area under the (segment) curve (AUC)**. This is calculated as $\sum_i s_i (1 - s_i)$, where $s_i (1 - s_i)$ is the contribution to $\alpha$ of the $i$-th segment.
 
-## Observations
-
-Note that $\alpha({\bf s})$ os a concave function. In particular,
-$$\frac{\partial \alpha}{\partial s_i} = 2 s_i -1$$
-Thus, the partial derivative is decreasing if $s_i < 0.5$, and is increasing if $s_i > 0.5$.
-
 ## Properties of AUC
 
 ### Extreme values
 
-If $M = 0$ (number of changepoints), then AUC = 0, and if $M = N$, then AUC = 1.
+If $M = 1$ (one segment), then AUC = 0, and if $M = N$, then AUC = 1.
 
 ### AUC increases if a segment is partitioned
 
@@ -37,16 +31,11 @@ $$
 (1 - s_m) s_m =  (1 - s_m) s_{m_1} + (1 - s_m)s_{m_2}
 $$
 $$
-< 
 (1 - s_{m_1})s_{m_1}
 + (1 - s_{m_2})s_{m_2}
 $$
 since $s_{m_1}, s_{m_2} < s_m$.
 So, $\alpha^{\prime} > \alpha$.
-
-### Collections of changepoints of the same size may have different AUC
-
-### Collections of changepoints of different sizes may have the same AUC
 
 ### Bounds on AUC
 
@@ -88,3 +77,7 @@ From the constraint, we know that $M \frac{1 - \lambda}{2} = 1$ and so
 $\lambda = 1 - \frac{2}{M}$.
 So, we conclude that $s_i = \frac{1}{M},$
 which is ${\bf s}_H$.
+
+### Collections of changepoints of the same size may have different AUC
+
+This follow immediately from the calculation of $\alpha_L, \alpha_H$. For a large number of segments, AUC can be anywhere in the interval $(0, 1)$.

@@ -18,6 +18,7 @@ from src.score import Score  # type: ignore
 import ast
 import collections
 import os
+import re
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
@@ -127,27 +128,33 @@ class PiecewiseSystemDiscovery(object):
             raise RuntimeError(
                     "PiecewiseSystemDiscovery must be fit() before this operation.")
 
-    def _parseChangepointsCell(self, raw: object) -> Optional[List[int]]:
+    @classmethod
+    def parseChangepointsCell(cls, raw: object, model_name: str="") -> Optional[List[int]]:
         """Parse a single ``changepoints`` cell value into a list of ints.
 
-        Returns an empty list when the cell is NaN or an empty string. Raises
-        ``ValueError`` if the cell parses via :func:`ast.literal_eval` but does
-        not yield a ``list``, and returns ``None`` on any other parse failure
-        (used by callers to mean "skip this row").
+        Accepts plain Python lists or their string forms, including cells
+        written by :func:`str` on a list of numpy scalars (e.g.
+        ``"[np.int64(20), np.int64(40)]"``); the numpy scalar wrappers are
+        stripped before parsing. Raises ``ValueError`` when *raw* is not a
+        string or list, when the cell is empty, or when it does not parse to
+        a list of ints.
         """
         if not isinstance(raw, (str, list)):
-            raise ValueError(f"Unexpected changepoints type in CSV for {self.model_name}: {type(raw).__name__}")
+            raise ValueError(f"Unexpected changepoints type in CSV for {model_name}: {type(raw).__name__}")
         text = str(raw).strip()
         if not text:
             raise ValueError("Changepoints cell is empty; cannot parse.")
+        # Strip numpy scalar wrappers (e.g. "np.int64(20)") left behind when a
+        # list of numpy scalars was stringified into the CSV (numpy >= 1.24 repr).
+        text = re.sub(r"np\.\w+\(([^)]*)\)", r"\1", text)
         try:
             parsed = ast.literal_eval(text)
         except (ValueError, SyntaxError):
-            raise ValueError(f"Invalid changepoints format in CSV for {self.model_name}: {text}")
+            raise ValueError(f"Invalid changepoints format in CSV for {model_name}: {text}")
 
         if not isinstance(parsed, list):
             raise ValueError(
-                f"Unexpected changepoints type in CSV for {self.model_name}: "
+                f"Unexpected changepoints type in CSV for {model_name}: "
                 f"{type(parsed).__name__}"
             )
         return [int(cp) for cp in parsed]
@@ -206,7 +213,7 @@ class PiecewiseSystemDiscovery(object):
 
         for i in range(len(masked_df)):
             raw_cp = cp_series.iloc[i]
-            parsed = self._parseChangepointsCell(raw_cp)
+            parsed = self.parseChangepointsCell(raw_cp, model_name=self.model_name)
             accuracy = float(acc_series.iloc[i])
             if np.isnan(accuracy):
                 raise ValueError(f"NaN accuracy in CSV for {self.model_name} at row {i}")

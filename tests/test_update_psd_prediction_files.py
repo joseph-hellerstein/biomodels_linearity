@@ -195,6 +195,19 @@ class TestAddBoundariesColumn(unittest.TestCase):
         self.assertEqual(result, 2)
         self.assertIn(cn.COL_BOUNDARIES, item.df.columns)
 
+    def test_numpy_wrapped_changepoints_string(self) -> None:
+        """Changepoints stringified from numpy scalars (``np.int64(...)``) parse."""
+        df = pd.DataFrame(
+            {cn.COL_SYSTEM_ID: ["BIOMD001"],
+             cn.COL_CHANGEPOINTS: ["[np.int64(20), np.int64(50)]"]},
+        )
+        item = _make_item(df, filepath=os.path.join(self._tmpdir.name, "test.csv"))
+        result = _addBoundariesColumn(item)
+        self.assertEqual(result, 1)
+        expected = [0, 20, 50, _NUM_POINT - 1]
+        actual = list(item.df[cn.COL_BOUNDARIES].iloc[0])
+        self.assertEqual(actual, expected)
+
 # ---------------------------------------------------------------------------
 # _backup tests
 # ---------------------------------------------------------------------------

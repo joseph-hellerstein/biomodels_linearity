@@ -1067,7 +1067,7 @@ class TestFitWithChangepointsFromFileLowReduction(unittest.TestCase):
     """
 
     #@unittest.skipUnless(_HAS_PSD_DATA, "PSD_DATA_DIR not found")
-    @unittest.skip("Temporary skip for missing file.")
+    @unittest.skipUnless(_HAS_PSD_DATA, "PSD data directory not found; skipping test.")
     def test_fit_with_changepoints_from_file(self) -> None:
         """Verify that fit() succeeds when is_changepoints_from_file=True for BioModel 5."""
         if IGNORE_TESTS or not HAS_REAL_ZIP:
@@ -1105,6 +1105,8 @@ class TestEndToEndBioModel5ChangepointsFromFile(unittest.TestCase):
     (one full-resolution, 100000-point segment), so each fit costs ~15-20s. Fitting
     once and reusing it across the three tests avoids paying that multiple times.
     """
+    tc: Timecourse
+    psd: PiecewiseSystemDiscovery
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -1164,6 +1166,55 @@ class TestBugs(unittest.TestCase):
         psd.fit()
         _ = psd.plotPiecewise(legend=False, num_true_point=60, is_nochangepoint_plot=False)
         #plt.show()
+
+
+class TestParseChangepointsCell(unittest.TestCase):
+    """Tests for :meth:`PiecewiseSystemDiscovery.parseChangepointsCell`."""
+
+    def test_plain_int_list_string(self) -> None:
+        if IGNORE_TESTS:
+            return
+        self.assertEqual(
+            PiecewiseSystemDiscovery.parseChangepointsCell("[20, 40]"), [20, 40])
+
+    def test_empty_list_string(self) -> None:
+        if IGNORE_TESTS:
+            return
+        self.assertEqual(
+            PiecewiseSystemDiscovery.parseChangepointsCell("[]"), [])
+
+    def test_python_list(self) -> None:
+        if IGNORE_TESTS:
+            return
+        self.assertEqual(
+            PiecewiseSystemDiscovery.parseChangepointsCell([20, 40]), [20, 40])
+
+    def test_numpy_scalar_wrappers(self) -> None:
+        """Cells stringified from a list of numpy scalars (numpy >= 1.24 repr)."""
+        if IGNORE_TESTS:
+            return
+        raw = "[np.int64(20), np.int64(13677)]"
+        self.assertEqual(
+            PiecewiseSystemDiscovery.parseChangepointsCell(raw, model_name="BIOMD001"),
+            [20, 13677])
+
+    def test_non_string_or_list_raises(self) -> None:
+        if IGNORE_TESTS:
+            return
+        with self.assertRaises(ValueError):
+            PiecewiseSystemDiscovery.parseChangepointsCell(float("nan"))
+
+    def test_empty_string_raises(self) -> None:
+        if IGNORE_TESTS:
+            return
+        with self.assertRaises(ValueError):
+            PiecewiseSystemDiscovery.parseChangepointsCell("   ")
+
+    def test_invalid_format_raises(self) -> None:
+        if IGNORE_TESTS:
+            return
+        with self.assertRaises(ValueError):
+            PiecewiseSystemDiscovery.parseChangepointsCell("not a list")
 
 
 if __name__ == "__main__":

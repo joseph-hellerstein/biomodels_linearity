@@ -101,7 +101,7 @@ def processModel(
     accuracy_df = score.score_df
     # Augment the dataframe with additional columns for the model
     accuracy_df[cn.COL_SYSTEM_ID] = model_name
-    accuracy_df[cn.COL_CHANGEPOINTS] = str(psd.changepoints)
+    accuracy_df[cn.COL_CHANGEPOINTS] = str([int(cp) for cp in (psd.changepoints or [])])
     accuracy_df[cn.COL_MAX_CHANGEPOINT] = max_changepoint
     accuracy_df[cn.COL_MAX_FRACTIONAL_REDUCTION] = max_fractional_reduction
     accuracy_df[cn.COL_COEFFICIENT_THRESHOLD] = coefficient_threshold
