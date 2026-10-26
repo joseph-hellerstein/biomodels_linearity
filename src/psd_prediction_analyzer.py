@@ -8,7 +8,7 @@ from src.timecourse_iterator import TimecourseIterator  # type: ignore
 
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
-from typing import Union
+from typing import Union, List, Any
 
 
 class PSDPredictionAnalyzer:
@@ -34,9 +34,16 @@ class PSDPredictionAnalyzer:
         self.min_accuracy = min_accuracy
         self.accuracy_statistic = accuracy_statistic
         self.is_guard_filename = is_guard_filename
+
         self.timecourse_df = timecourse_df
         self.model_df = self.getModelDF() # DataFrame with PSD predictions for the model
         self.best_model_ser = self._getModelBestSer()  # Best PSD prediction
+
+    def _checkInitialized(self) -> None:
+        """Checks if the PSDPredictionAnalyzer object is properly initialized.
+        """
+        if self.model_df is None or self.best_model_ser is None:
+            raise ValueError("PSDPredictionAnalyzer is not properly initialized.")
 
     def _filterDataframe(self, df: pd.DataFrame, dct: dict) -> pd.DataFrame:
         """Filters a DataFrame based on the provided dictionary of conditions.
@@ -65,10 +72,23 @@ class PSDPredictionAnalyzer:
         """
         filtered_df = PSDPredictionFileIterator.query(is_guard_filename=self.is_guard_filename,
                 dataframe_filter=self._filterDataframe, data_dir=self.data_dir, is_pkl= True)
+        #filtered_df[cn.COL_CHANGEPOINTS] = filtered_df[cn.COL_CHANGEPOINTS].apply(json.loads)
+        #filtered_df[cn.COL_BOUNDARIES] = filtered_df[cn.COL_BOUNDARIES].apply(json.loads)
+        changepoint_list: List[Any] = []
+        boundaries_list: List[Any] = []
+        for _, row in filtered_df.iterrows():
+            if isinstance(row[cn.COL_CHANGEPOINTS], str):
+                row[cn.COL_CHANGEPOINTS] = eval(row[cn.COL_CHANGEPOINTS])
+            changepoint_list.append(row[cn.COL_CHANGEPOINTS])
+            if isinstance(row[cn.COL_BOUNDARIES], str):
+                row[cn.COL_BOUNDARIES] = eval(row[cn.COL_BOUNDARIES])
+            boundaries_list.append(row[cn.COL_BOUNDARIES])
         #
+        filtered_df[cn.COL_CHANGEPOINTS] = changepoint_list
+        filtered_df[cn.COL_BOUNDARIES] = boundaries_list
         return filtered_df.reset_index()
 
-    def _getModelBestSer(self) -> "pd.Series | None":
+    def _getModelBestSer(self) -> pd.Series | None:
         """Gets the best series for the model based on the optimization criteria:
             Min AUC subject to the accuracy constraints.
 
@@ -78,10 +98,12 @@ class PSDPredictionAnalyzer:
         """
         if self.model_df.empty:
             return None
+            #raise ValueError(f"No PSD predictions found for model {self.model_name}.")
         mask = self.model_df[self.accuracy_statistic] >= self.min_accuracy
         df_filtered = self.model_df.loc[mask].copy()
         if df_filtered.empty:
             return None
+            #raise ValueError(f"No PSD predictions found for model {self.model_name} with min_accuracy {self.min_accuracy}.")
         best_idx = df_filtered[cn.COL_AUC].idxmin()
         ser = self.model_df.loc[best_idx]  # type: ignore[assignment]
         return ser
@@ -92,14 +114,20 @@ class PSDPredictionAnalyzer:
         Returns:
             Model: A Model object representing the best PSD prediction.
         """
+        self._checkInitialized()
         if self.timecourse_df is None:
             timecourse_df = TimecourseIterator.getTimecourse(self.model_name).timecourse_df
         else:
             timecourse_df = self.timecourse_df
+        if cn.COL_COEFFICIENT_THRESHOLD not in self.best_model_ser:  # type: ignore
+            coefficient_threshold = cn.DEF_COEFFICIENT_THRESHOLD
+        else:
+            coefficient_threshold = self.best_model_ser[cn.COL_COEFFICIENT_THRESHOLD] # type: ignore
         if self.best_model_ser is None:
             raise ValueError(f"No valid PSD predictions found for model {self.model_name} with min_accuracy {self.min_accuracy}.")
         psd = PiecewiseSystemDiscovery(timecourse_df, 
                 changepoints=self.best_model_ser.changepoints,
+                coefficient_threshold=coefficient_threshold,
                 is_changepoint_removal=False,
                 model_id=self.model_name)
         psd.fit()
@@ -112,6 +140,7 @@ class PSDPredictionAnalyzer:
             pd.DataFrame: A DataFrame containing the analysis results, including the AUC values and
             their consistency metrics.
         """
+        self._checkInitialized()
         grouped_df = self.model_df.groupby(cn.COL_MAX_FRACTIONAL_REDUCTION).agg({
             cn.COL_AUC: [cn.COL_MEAN, cn.COL_STD, cn.COL_COUNT],
         })

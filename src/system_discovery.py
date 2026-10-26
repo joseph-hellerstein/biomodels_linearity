@@ -130,7 +130,7 @@ class SystemDiscovery:
         self,
         training_df: pd.DataFrame,
         model_id: Optional[Union[str, int]] = None,
-        coefficient_threshold: float = 0.01,
+        coefficient_threshold: float = cn.DEF_COEFFICIENT_THRESHOLD,
         alpha: float = 0.05,
         differentiation: Union[Literal["smooth"], Literal["finite"], Literal["spectral"]] = "smooth",
         poly_degree: int = 1,
