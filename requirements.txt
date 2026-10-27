@@ -14,9 +14,11 @@ python-libsbml
 pysindy
 regex
 ruptures
+SBMLKinetics
 scikit-learn
 scipy
 seaborn
+sympy
 sbmlnetwork
 tellurium
 toml
