@@ -22,6 +22,7 @@ from src.psd_prediction_analyzer import (  # type: ignore
     PSDPredictionAnalyzer,
 )
 from src.timecourse_iterator import TimecourseIterator  # type: ignore
+from src.psd_prediction_file_iterator import PSDPredictionFileIterator  # type: ignore
 
 _HAS_PSD_DATA = os.path.isdir(cn.PSD_DATA_DIR)
 
@@ -279,6 +280,163 @@ class TestMakeBestPSD(unittest.TestCase):
         self._write_pkl(pd.DataFrame([_row(system_id="WRONG_ID")]))
         with self.assertRaises(ValueError):
             self._make_analyzer().makeBestPSD()
+
+
+# ---------------------------------------------------------------------------
+# makeBestPSDModelDF
+# ---------------------------------------------------------------------------
+
+
+class TestMakeBestPSDModelDF(unittest.TestCase):
+    """Unit tests for the makeBestPSDModelDF classmethod.
+
+    TimecourseIterator is mocked to yield a fixed set of model names, and
+    PSDPredictionFileIterator.query is mocked to serve an in-memory DataFrame
+    (filtered per model by the analyzer's own _filterDataframe), so no real
+    data files or zip archives are read.
+
+    Note: the source's threshold parameter is misspelled ``min_accuarcy``;
+    these tests pass that exact keyword.
+    """
+
+    def setUp(self) -> None:
+        self._tmpdir = tempfile.TemporaryDirectory()  # type: ignore
+        self._run_count = 0
+
+    def tearDown(self) -> None:
+        self._tmpdir.cleanup()
+
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+
+    def _qualifying_row(self, system_id: str, auc: float) -> dict:
+        """Return a row that qualifies at the default min_accuracy (p50=0.9 >= 0.8)."""
+        return _row(system_id=system_id, auc=auc, p50=0.9)
+
+    def _fake_timecourse_items(self, model_names: list) -> list:
+        """Return iterable items (with a model_name) standing in for TimecourseIterator."""
+        return [types.SimpleNamespace(model_name=name) for name in model_names]
+
+    def _run(self, base_df: pd.DataFrame, model_names: list, **kwargs) -> pd.DataFrame:
+        """Run makeBestPSDModelDF with a mocked TimecourseIterator and query."""
+        output_path = kwargs.pop("output_path", None)
+        if output_path is None:
+            # Unique per call: makeBestPSDModelDF returns the cached CSV if
+            # output_path already exists, so a shared path would leak results.
+            self._run_count += 1
+            output_path = os.path.join(self._tmpdir.name,
+                                       f"best_psd_models_{self._run_count}.csv")
+
+        def fake_query(dataframe_filter=None, **_kwargs):
+            df = base_df.copy()
+            if dataframe_filter is not None:
+                df = dataframe_filter(df, {})
+            return df.reset_index(drop=True)
+
+        with patch("src.psd_prediction_analyzer.TimecourseIterator",
+                   return_value=self._fake_timecourse_items(model_names)), \
+             patch.object(PSDPredictionFileIterator, "query", side_effect=fake_query):
+            return PSDPredictionAnalyzer.makeBestPSDModelDF(  # type: ignore
+                output_path=output_path, **kwargs)
+
+    # ------------------------------------------------------------------
+    # happy path
+    # ------------------------------------------------------------------
+
+    def test_returns_dataframe(self) -> None:
+        base_df = pd.DataFrame([
+            self._qualifying_row("BIOMD0000000005", 0.2),
+            self._qualifying_row("BIOMD0000000010", 0.1),
+        ])
+        result = self._run(base_df, ["BIOMD0000000005", "BIOMD0000000010"])
+        self.assertIsInstance(result, pd.DataFrame)
+
+    def test_one_row_per_model_in_iteration_order(self) -> None:
+        base_df = pd.DataFrame([
+            self._qualifying_row("BIOMD0000000005", 0.2),
+            self._qualifying_row("BIOMD0000000010", 0.1),
+        ])
+        result = self._run(base_df, ["BIOMD0000000005", "BIOMD0000000010"])
+        self.assertEqual(len(result), 2)
+        self.assertEqual(
+            result[cn.COL_SYSTEM_ID].tolist(),
+            ["BIOMD0000000005", "BIOMD0000000010"],
+        )
+
+    def test_each_row_is_min_auc_qualifying_ser(self) -> None:
+        """Each model's row should be its own min-AUC qualifying prediction."""
+        base_df = pd.DataFrame([
+            self._qualifying_row("BIOMD0000000005", 0.9),
+            self._qualifying_row("BIOMD0000000005", 0.2),
+            self._qualifying_row("BIOMD0000000010", 0.5),
+            self._qualifying_row("BIOMD0000000010", 0.1),
+        ])
+        result = self._run(base_df, ["BIOMD0000000005", "BIOMD0000000010"])
+        by_id = dict(zip(result[cn.COL_SYSTEM_ID], result[cn.COL_AUC]))
+        self.assertAlmostEqual(by_id["BIOMD0000000005"], 0.2)
+        self.assertAlmostEqual(by_id["BIOMD0000000010"], 0.1)
+
+    def test_writes_csv_to_output_path(self) -> None:
+        base_df = pd.DataFrame([
+            self._qualifying_row("BIOMD0000000005", 0.2),
+            self._qualifying_row("BIOMD0000000010", 0.1),
+        ])
+        output_path = os.path.join(self._tmpdir.name, "out.csv")
+        result = self._run(base_df, ["BIOMD0000000005", "BIOMD0000000010"],
+                           output_path=output_path)
+        self.assertTrue(os.path.exists(output_path))
+        csv_df = pd.read_csv(output_path)
+        self.assertEqual(csv_df[cn.COL_SYSTEM_ID].tolist(),
+                         result[cn.COL_SYSTEM_ID].tolist())
+        self.assertAlmostEqual(csv_df.loc[0, cn.COL_AUC], 0.2)
+
+    def test_returns_cached_csv_when_output_exists(self) -> None:
+        """If output_path already exists, the cached CSV is returned as-is."""
+        base_df = pd.DataFrame([self._qualifying_row("BIOMD0000000005", 0.2)])
+        output_path = os.path.join(self._tmpdir.name, "cached.csv")
+        self._run(base_df, ["BIOMD0000000005"], output_path=output_path)
+        # Underlying data now yields a different best AUC, but the cache wins.
+        changed_df = pd.DataFrame([self._qualifying_row("BIOMD0000000005", 0.7)])
+        second = self._run(changed_df, ["BIOMD0000000005"], output_path=output_path)
+        self.assertAlmostEqual(second[cn.COL_AUC].iloc[0], 0.2)
+
+    # ------------------------------------------------------------------
+    # parameter forwarding
+    # ------------------------------------------------------------------
+
+    def test_min_accuracy_affects_selection(self) -> None:
+        """A lower-AUC row that fails min_accuracy must not be selected."""
+        base_df = pd.DataFrame([
+            _row(system_id="BIOMD0000000005", auc=0.9, p50=0.9),  # qualifies at 0.8
+            _row(system_id="BIOMD0000000005", auc=0.2, p50=0.1),  # fails at 0.8
+        ])
+        strict = self._run(base_df, ["BIOMD0000000005"], min_accuarcy=0.8)
+        self.assertAlmostEqual(strict[cn.COL_AUC].iloc[0], 0.9)
+        lenient = self._run(base_df, ["BIOMD0000000005"], min_accuarcy=0.0)
+        self.assertAlmostEqual(lenient[cn.COL_AUC].iloc[0], 0.2)
+
+    def test_accuracy_stat_affects_selection(self) -> None:
+        """Selection should follow the requested accuracy statistic, not just p50."""
+        base_df = pd.DataFrame([
+            _row(system_id="BIOMD0000000005", auc=0.2, p50=0.9, mean=0.1),  # fails on mean
+            _row(system_id="BIOMD0000000005", auc=0.9, p50=0.9, mean=0.9),  # qualifies on mean
+        ])
+        by_mean = self._run(base_df, ["BIOMD0000000005"],
+                            min_accuarcy=0.8, accuracy_stat="mean")
+        self.assertAlmostEqual(by_mean[cn.COL_AUC].iloc[0], 0.9)
+        by_p50 = self._run(base_df, ["BIOMD0000000005"],
+                           min_accuarcy=0.8, accuracy_stat="p50")
+        self.assertAlmostEqual(by_p50[cn.COL_AUC].iloc[0], 0.2)
+
+    # ------------------------------------------------------------------
+    # error paths
+    # ------------------------------------------------------------------
+
+    def test_empty_model_list_raises(self) -> None:
+        """With no models to iterate, pd.concat has nothing and raises ValueError."""
+        with self.assertRaises(ValueError):
+            self._run(pd.DataFrame([self._qualifying_row("BIOMD0000000005", 0.2)]), [])
 
 
 # ---------------------------------------------------------------------------

@@ -50,6 +50,7 @@ class TimecourseIterator:
         self.last_model_num = last_model_num
         self.num_point = num_point
         self.is_report = is_report
+        self.is_requires_dataframe = is_requires_dataframe
         self.model_name_collection = model_collection
         if self.model_name_collection is not None:
             self.model_name_collection = [Model.getModelNumberAndName(r)[1] for r in self.model_name_collection]

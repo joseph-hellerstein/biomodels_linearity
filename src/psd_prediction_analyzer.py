@@ -6,16 +6,19 @@ from src.model import Model  # type: ignore
 from src.piecewise_system_discovery import PiecewiseSystemDiscovery  # type: ignore
 from src.timecourse_iterator import TimecourseIterator  # type: ignore
 
+import os
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
-from typing import Union, List, Any
+from typing import Union, List, Any, cast
+
+OUTPUT_PATH = os.path.join(cn.DATA_DIR, "psd_prediction_analyzer_output.csv")
 
 
 class PSDPredictionAnalyzer:
 
     def __init__(self, model_id: Union[str, int],
             min_accuracy : float = cn.DEF_MIN_ACCURACY,
-            accuracy_statistic: str = cn.DEF_ACCURACY_STAT,
+            accuracy_stat: str = cn.DEF_ACCURACY_STAT,
             is_guard_filename: bool = True,
             timecourse_df: pd.DataFrame | None = None,
             data_dir: str = cn.PSD_DATA_DIR) -> None:
@@ -32,7 +35,7 @@ class PSDPredictionAnalyzer:
         self.model_num, self.model_name = Model.getModelNumberAndName(model_id)
         self.data_dir = data_dir
         self.min_accuracy = min_accuracy
-        self.accuracy_statistic = accuracy_statistic
+        self.accuracy_statistic = accuracy_stat
         self.is_guard_filename = is_guard_filename
 
         self.timecourse_df = timecourse_df
@@ -98,12 +101,10 @@ class PSDPredictionAnalyzer:
         """
         if self.model_df.empty:
             return None
-            #raise ValueError(f"No PSD predictions found for model {self.model_name}.")
         mask = self.model_df[self.accuracy_statistic] >= self.min_accuracy
         df_filtered = self.model_df.loc[mask].copy()
         if df_filtered.empty:
             return None
-            #raise ValueError(f"No PSD predictions found for model {self.model_name} with min_accuracy {self.min_accuracy}.")
         best_idx = df_filtered[cn.COL_AUC].idxmin()
         ser = self.model_df.loc[best_idx]  # type: ignore[assignment]
         return ser
@@ -150,6 +151,34 @@ class PSDPredictionAnalyzer:
         return pd.DataFrame(grouped_df)
 
     @classmethod
+    def makeBestPSDModelDF(cls, min_accuarcy: float = cn.DEF_MIN_ACCURACY,
+            accuracy_stat: str = cn.DEF_ACCURACY_STAT,
+            output_path: str = OUTPUT_PATH,
+            ) -> pd.DataFrame:
+        """Create the best PSD models for all models meeting the minimum accuracy threshold.
+
+        Args:
+            min_accuarcy (float): The minimum accuracy threshold for predictions to be considered valid.
+            output_path (str): The path to save the output CSV file containing the best PSD models.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing the best PSD models and their associated metadata.
+        """
+        if os.path.exists(output_path):
+            return pd.read_csv(output_path)
+        #
+        t_iter = TimecourseIterator()
+        sers: List[pd.Series] = []
+        for item in t_iter:
+            analyzer = PSDPredictionAnalyzer(item.model_name, min_accuracy=min_accuarcy,
+                    accuracy_stat=accuracy_stat)
+            sers.append(cast(pd.Series, analyzer.best_model_ser))
+        # Save the results to the specified output path
+        best_model_df = pd.concat(sers, axis=1).T
+        best_model_df.to_csv(output_path, index=False)
+        return best_model_df
+
+    @classmethod
     def plotBestLinearFits(cls,
             model_ids: list[Union[str, int]],
             min_accuracy: float = cn.DEF_MIN_ACCURACY,
@@ -168,7 +197,7 @@ class PSDPredictionAnalyzer:
         """
         for model_id in model_ids:
             analyzer = cls(model_id, min_accuracy=min_accuracy,
-                    accuracy_statistic=accuracy_statistic,
+                    accuracy_stat=accuracy_statistic,
                     is_guard_filename=is_guard_filename,
                     data_dir=data_dir)
             psd = analyzer.makeBestPSD()
