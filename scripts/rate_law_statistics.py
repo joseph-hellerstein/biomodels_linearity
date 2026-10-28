@@ -241,7 +241,10 @@ def main() -> None:
         df = pd.read_csv(args.output)
         rows = [r.to_dict() for i, r in df.iterrows()]
     # Iterate across rows
+    processed_model_nums = [r[cn.COL_MODEL_NUM] for r in rows]
     for model_num in model_nums:
+        if model_num in processed_model_nums:
+            continue
         sbml_path = getModelPath(model_num)
         if not os.path.exists(sbml_path):
             print(
@@ -257,6 +260,7 @@ def main() -> None:
         # Write on each iteration
         df = pd.DataFrame(rows, columns=CSV_COLUMNS)
         df.to_csv(args.output, index=False)
+        processed_model_nums.append(model_num)
 
     if not rows:
         print("Error: no valid models to process.", file=sys.stderr)
