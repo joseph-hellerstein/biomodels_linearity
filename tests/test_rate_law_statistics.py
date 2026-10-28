@@ -106,7 +106,7 @@ def _make_reaction(checks: dict) -> MagicMock:
     kinetic_law.symbols = ["k", "S1"]
     reaction.reactants = []
     reaction.products = []
-    for method_name, _ in m.K_TYPE_CHECKS:
+    for _, method_name in m.K_TYPE_CHECKS:
         value = checks.get(method_name, False)
         if isinstance(value, Exception):
             getattr(kinetic_law, method_name).side_effect = value
@@ -120,7 +120,8 @@ def _fake_sbml_file(biomodels_dir: str, model_num: int) -> None:
     model_name = m.getModelName(model_num)
     model_dir = os.path.join(biomodels_dir, model_name)
     os.makedirs(model_dir, exist_ok=True)
-    with open(os.path.join(model_dir, f"{model_name}_url.xml"), "w"):
+    with open(os.path.join(model_dir, f"{model_name}_url.xml"), "w",
+              encoding="utf-8"):
         pass
 
 
@@ -162,7 +163,8 @@ class TestGetModelNumsInRange(unittest.TestCase):
 
     def _add_entries(self, *entries: str) -> None:
         for entry in entries:
-            with open(os.path.join(self._tmpdir.name, entry), "w"):
+            with open(os.path.join(self._tmpdir.name, entry), "w",
+                      encoding="utf-8"):
                 pass
 
     def _nums_in_range(self, first: int, last: int) -> list[int]:
@@ -235,7 +237,7 @@ class TestReadModel(unittest.TestCase):
 
     def test_exits_with_error_for_unparseable_file(self) -> None:
         bad_path = os.path.join(self._tmpdir.name, "bad.xml")
-        with open(bad_path, "w") as f:
+        with open(bad_path, "w", encoding="utf-8") as f:
             f.write("this is not SBML <<<")
         stderr = StringIO()
         with redirect_stderr(stderr):
@@ -388,6 +390,8 @@ class TestMain(unittest.TestCase):
             self.assertEqual(df.loc[0, column], expected_row[column])
 
     def test_missing_sbml_file_is_skipped_with_warning(self) -> None:
+        # Model 1's directory exists but has no SBML file; model 2 is complete.
+        os.makedirs(os.path.join(self.biomodels_dir, "BIOMD0000000001"))
         _fake_sbml_file(self.biomodels_dir, 2)
         with patch.object(m, "analyzeModel", return_value=_stats()):
             _, stderr = self._run_main(1, 2)

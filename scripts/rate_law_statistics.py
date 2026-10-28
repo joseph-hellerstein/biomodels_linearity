@@ -28,12 +28,14 @@ import os
 import sys
 
 import pandas as pd  # type: ignore
-from sympy import simplify  # type: ignore
+from sympy import im, simplify  # type: ignore
 
 import libsbml  # type: ignore
 from SBMLKinetics.common.function_definition import FunctionDefinition  # type: ignore
 from SBMLKinetics.common.reaction import Reaction  # type: ignore
 
+# Excluded models
+EXCLUDED_MODELS = [64]
 # (label, KineticLaw method) pairs in the reference implementation's order.
 K_TYPE_CHECKS = [
     ("ZERO", "isZerothOrder"),
@@ -241,7 +243,7 @@ def main() -> None:
         df = pd.read_csv(args.output)
         rows = [r.to_dict() for i, r in df.iterrows()]
     # Iterate across rows
-    processed_model_nums = [r[cn.COL_MODEL_NUM] for r in rows]
+    processed_model_nums = [r[cn.COL_MODEL_NUM] for r in rows] + EXCLUDED_MODELS
     for model_num in model_nums:
         if model_num in processed_model_nums:
             continue
