@@ -2,9 +2,11 @@
 
 import os
 import pickle
+import re
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd  # type: ignore
@@ -311,6 +313,62 @@ class TestTimecourseIteratorGetTimecourse(unittest.TestCase):
         self.assertEqual(tc_b.model.model_name, "model_B")
 
 
+class TestTimecourseIteratorGetModelNums(unittest.TestCase):
+    """Tests for TimecourseIterator.getModelNums using a synthetic zip."""
+
+    def setUp(self) -> None:
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._zip_path = os.path.join(self._tmpdir.name, "test.zip")
+
+    def tearDown(self) -> None:
+        self._tmpdir.cleanup()
+
+    def test_returns_model_numbers_from_zip(self) -> None:
+        if IGNORE_TESTS:
+            return
+        _makeZipWithTimecourses(self._zip_path, ["BIOMD0000000001", "BIOMD0000000002"])
+        self.assertEqual(TimecourseIterator.getModelNums(zip_path=self._zip_path), [1, 2])
+
+    def test_returns_numbers_in_numeric_order(self) -> None:
+        if IGNORE_TESTS:
+            return
+        # Zip insertion order and lexicographic name order both differ from numeric order.
+        with zipfile.ZipFile(self._zip_path, 'w') as zf:
+            for name in ["BIOMD0000000010", "BIOMD2"]:
+                zf.writestr(f"{name}_timecourse.pkl", b"dummy")
+        self.assertEqual(TimecourseIterator.getModelNums(zip_path=self._zip_path), [2, 10])
+
+    def test_skips_non_biomd_entries(self) -> None:
+        if IGNORE_TESTS:
+            return
+        _makeZipWithTimecourses(self._zip_path, ["BIOMD0000000001"])
+        with zipfile.ZipFile(self._zip_path, 'a') as zf:
+            zf.writestr("README.txt", "skip me")
+            zf.writestr("model_A_timecourse.pkl", b"skip me too")
+        self.assertEqual(TimecourseIterator.getModelNums(zip_path=self._zip_path), [1])
+
+    def test_empty_zip_returns_empty_list(self) -> None:
+        if IGNORE_TESTS:
+            return
+        with zipfile.ZipFile(self._zip_path, 'w') as _:
+            pass
+        self.assertEqual(TimecourseIterator.getModelNums(zip_path=self._zip_path), [])
+
+    def test_raises_for_missing_zip_file(self) -> None:
+        if IGNORE_TESTS:
+            return
+        missing_path = os.path.join(self._tmpdir.name, "missing.zip")
+        with self.assertRaises(FileNotFoundError):
+            TimecourseIterator.getModelNums(zip_path=missing_path)
+
+    def test_default_zip_path_uses_getZipPath(self) -> None:
+        if IGNORE_TESTS:
+            return
+        _makeZipWithTimecourses(self._zip_path, ["BIOMD0000000007"])
+        with patch.object(TimecourseIterator, "getZipPath", return_value=self._zip_path):
+            self.assertEqual(TimecourseIterator.getModelNums(), [7])
+
+
 @unittest.skipUnless(HAS_REAL_ZIP, "Real timecourse zip not found")
 class TestTimecourseIteratorRealZip(unittest.TestCase):
     """Integration tests using the real timecourse zip at cn.TIMECOURSE_ZIP_PATH."""
@@ -363,6 +421,30 @@ class TestTimecourseIteratorGetTimecourseRealZip(unittest.TestCase):
             return
         tc = TimecourseIterator().getTimecourse(FIRST_REAL_MODEL)
         self.assertFalse(tc._timecourse_df.empty)
+
+
+@unittest.skipUnless(HAS_REAL_ZIP, "Real timecourse zip not found")
+class TestTimecourseIteratorGetModelNumsRealZip(unittest.TestCase):
+    """Integration tests for getModelNums using the real timecourse zip."""
+
+    def test_returns_nonempty_sorted_list(self) -> None:
+        if IGNORE_TESTS:
+            return
+        model_nums = TimecourseIterator.getModelNums()
+        self.assertGreater(len(model_nums), 1)
+        self.assertEqual(model_nums, sorted(model_nums))
+
+    def test_matches_numbers_in_namelist(self) -> None:
+        if IGNORE_TESTS:
+            return
+        model_nums = TimecourseIterator.getModelNums()
+        expected = []
+        with zipfile.ZipFile(TimecourseIterator.getZipPath(num_point=cn.NUM_POINT)) as zf:
+            for name in zf.namelist():
+                match = re.fullmatch(r"BIOMD(\d+)_timecourse\.pkl", name)
+                if match is not None:
+                    expected.append(int(match.group(1)))
+        self.assertEqual(model_nums, sorted(expected))
 
 
 if __name__ == "__main__":

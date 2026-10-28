@@ -6,6 +6,35 @@ classifies each reaction's kinetic law into one of ten mutually exclusive
 kinetics types (ZERO, UNDR, UNMO, BIDR, BIMO, MM, MMCAT, HILL, FR, NA), and
 writes the per-model counts to a CSV file.
 
+The classification system is from:
+
+@article{xu_sbmlkinetics_2023,
+	title = {{SBMLKinetics}: a tool for annotation-independent classification of reaction
+    kinetics for {SBML} models},
+	volume = {24},
+	issn = {1471-2105},
+	url = {https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-023-05380-3},
+	doi = {10.1186/s12859-023-05380-3},
+
+Zeroth order (ZERO) the number of species in the kinetic law was zero; 
+Uni-directional mass action (UNDR) the kinetic law was a single product of terms
+    and all species in the kinetic law were reactants
+Uni-term with the moderator (UNMO) the kinetic law was a single product of terms
+    and not UNDR, namely at least one species in the kinetic law was not a reactant
+Bi-directional mass action (BIDR) the kinetic law was the difference between two  products of terms,
+    and the first product of terms contained species as all the reactants
+    while the second product of terms contained species as all the products
+Bi-terms with the moderator (BIMO) the kinetic law was the difference between two products of terms
+    and NOT BIDR
+Michaelis–Menten kinetics without explicit enzyme (MM) the kinetic law was in the
+    format of Michaelis–Menten expressions without an explicit enzyme
+Michaelis–Menten kinetics with an explicit enzyme (MMCAT) the kinetic law was in
+    the format of Michaelis–Menten expressions with an explicit enzyme
+Hill equation (HILL) the kinetic law was in the format of Hill equations
+Fraction format other than MM, MMCAT, and HILL (FR) the kinetic law was in
+    the format of fraction with at least one species in the denominator and NOT MM, MMCAT, or HILL
+Not classified (NA) not classified kinetics.
+
 Classification follows the SBMLKinetics reference implementation: model
 function definitions are expanded into each formula, the formula is simplified
 with sympy, and the type checks run in order with the first match winning.
@@ -22,6 +51,7 @@ Arguments:
 """
 import src.constants as cn  # type: ignore
 from src.biomodels_iterator import BiomodelsIterator  # type: ignore
+from src.timecourse_iterator import TimecourseIterator  # type: ignore
 
 import argparse
 import os
@@ -35,7 +65,7 @@ from SBMLKinetics.common.function_definition import FunctionDefinition  # type: 
 from SBMLKinetics.common.reaction import Reaction  # type: ignore
 
 # Excluded models
-EXCLUDED_MODELS = [64]
+EXCLUDED_MODELS = [64, 849]
 # (label, KineticLaw method) pairs in the reference implementation's order.
 K_TYPE_CHECKS = [
     ("ZERO", "isZerothOrder"),
@@ -236,7 +266,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    model_nums = getModelNumsInRange(args.first_model_num, args.last_model_num)
+    selected_model_nums = TimecourseIterator.getModelNums()
     # Initialize rows
     rows = []
     if os.path.exists(args.output):
@@ -244,10 +274,15 @@ def main() -> None:
         rows = [r.to_dict() for i, r in df.iterrows()]
     # Iterate across rows
     processed_model_nums = [r[cn.COL_MODEL_NUM] for r in rows] + EXCLUDED_MODELS
-    for model_num in model_nums:
+    #for model_num in model_nums:
+    for item in BiomodelsIterator(first_model_num=args.first_model_num,
+            last_model_num=args.last_model_num):
+        model_num = item.model_num
+        if not model_num in selected_model_nums:
+            continue
         if model_num in processed_model_nums:
             continue
-        sbml_path = getModelPath(model_num)
+        sbml_path = item.sbml_paths[0]
         if not os.path.exists(sbml_path):
             print(
                 f"Invalid model number: {model_num} "
@@ -255,8 +290,6 @@ def main() -> None:
                 file=sys.stderr,
             )
             continue
-        model_name = getModelName(model_num)
-        print(f"Processing model: {model_name}")
         stats = analyzeModel(sbml_path)
         rows.append(makeRow(model_num, stats))
         # Write on each iteration

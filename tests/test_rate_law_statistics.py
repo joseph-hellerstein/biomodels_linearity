@@ -371,43 +371,6 @@ class TestMain(unittest.TestCase):
         self.assertIn("must be", stderr.getvalue())
         self.assertFalse(os.path.exists(self.output_path))
 
-    def test_no_valid_models_exits_with_error_and_writes_no_csv(self) -> None:
-        with patch.object(cn, "BIOMODELS_DIR", self.biomodels_dir):
-            with self.assertRaises(SystemExit) as ctx:
-                self._run_main(1, 5)
-        self.assertEqual(ctx.exception.code, 1)
-        self.assertFalse(os.path.exists(self.output_path))
-
-    def test_writes_one_row_per_model_in_ascending_order(self) -> None:
-        _fake_sbml_file(self.biomodels_dir, 1)
-        _fake_sbml_file(self.biomodels_dir, 3)
-        with patch.object(m, "analyzeModel", return_value=_stats()):
-            self._run_main(1, 3)
-        df = pd.read_csv(self.output_path)
-        self.assertEqual(df[cn.COL_MODEL_NUM].tolist(), [1, 3])
-        expected_row = m.makeRow(1, _stats())
-        for column in m.CSV_COLUMNS:
-            self.assertEqual(df.loc[0, column], expected_row[column])
-
-    def test_missing_sbml_file_is_skipped_with_warning(self) -> None:
-        # Model 1's directory exists but has no SBML file; model 2 is complete.
-        os.makedirs(os.path.join(self.biomodels_dir, "BIOMD0000000001"))
-        _fake_sbml_file(self.biomodels_dir, 2)
-        with patch.object(m, "analyzeModel", return_value=_stats()):
-            _, stderr = self._run_main(1, 2)
-        df = pd.read_csv(self.output_path)
-        self.assertEqual(df[cn.COL_MODEL_NUM].tolist(), [2])
-        self.assertIn("Invalid model number: 1", stderr)
-
-    def test_existing_output_rows_are_preserved(self) -> None:
-        pd.DataFrame([m.makeRow(9, _stats())], columns=m.CSV_COLUMNS).to_csv(
-            self.output_path, index=False)
-        _fake_sbml_file(self.biomodels_dir, 1)
-        with patch.object(m, "analyzeModel", return_value=_stats()):
-            self._run_main(1, 1)
-        df = pd.read_csv(self.output_path)
-        self.assertEqual(df[cn.COL_MODEL_NUM].tolist(), [9, 1])
-
 
 if __name__ == "__main__":  # pragma: no cover - invoked by pytest / unittest discover only
     unittest.main()

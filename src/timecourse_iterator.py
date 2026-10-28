@@ -81,13 +81,13 @@ class TimecourseIterator:
             raise ValueError(f"Unsupported num_point {num_point}. Use 1000, 10000, or 100000.")
 
     @staticmethod
-    def _getModelNumFromZipfilename(zipfilename: str) -> int | None:
+    def _getModelNumFromZipfilename(zipfilename: str) -> int:
         """Return the model number from the given zip filename."""
         if zipfilename.startswith("BIOMD"):
             model_num = int(zipfilename[: -len('_timecourse.pkl')].replace('BIOMD', ''))
             return model_num
         else:
-            return None
+            return -1
 
     @classmethod
     def getTimecourse(cls, model_id: Union[str, int],
@@ -137,19 +137,26 @@ class TimecourseIterator:
         # Process the files in the zip path
         with zipfile.ZipFile(self.zip_path, 'r') as zf:
             names = sorted(zf.namelist())
+            model_num: int | None = -1
             for name in names:
                 model_num = self._getModelNumFromZipfilename(name)
-                if model_num is None:
-                    continue
-                model_name = Model.getModelNumberAndName(model_num)[1]
-                if model_num not in self._valid_model_nums:
-                    continue
+                if model_num  == -1:
+                    # Not a Biomodels name
+                    if not "_timecourse.pkl" in name:
+                        model_name = name
+                    else:
+                        model_name = name.replace("_timecourse.pkl", "")
+                else:
+                    # Biomodels name
+                    if model_num not in self._valid_model_nums:
+                        continue
+                    model_name = Model.getModelNumberAndName(model_num)[1]
+                    if model_num < self.first_model_num:
+                        continue
+                    if self.last_model_num >= 0 and model_num > self.last_model_num:
+                        break
                 if self.is_report:
                     print(f"Processing {model_num}")
-                if model_num < self.first_model_num:
-                    continue
-                if self.last_model_num >= 0 and model_num > self.last_model_num:
-                    break
                 if self.model_name_collection is not None and model_name not in self.model_name_collection:
                     continue
                 if self._is_curated:
@@ -219,7 +226,7 @@ class TimecourseIterator:
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             for entry_name in zip_ref.namelist():
                 model_num = cls._getModelNumFromZipfilename(entry_name)
-                if model_num is None:
+                if model_num == -1:
                     continue
                 model_nums.append(model_num)
         return sorted(model_nums)
