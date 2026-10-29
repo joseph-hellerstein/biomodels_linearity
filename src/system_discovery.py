@@ -34,7 +34,7 @@ Usage
     summary = disc.summary()
 """
 
-import constants as cn # type: ignore
+import src.constants as cn # type: ignore
 from src.scaler import Scaler  # type: ignore
 from src.timecourse import Timecourse  # type: ignore
 from src.timecourse_iterator import TimecourseIterator  # type: ignore

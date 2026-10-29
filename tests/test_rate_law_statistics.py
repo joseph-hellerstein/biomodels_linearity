@@ -102,7 +102,7 @@ def _make_reaction(checks: dict) -> MagicMock:
     """
     reaction = MagicMock()
     kinetic_law = reaction.kinetic_law
-    kinetic_law.expanded_formula = sympy.Symbol("k") * sympy.Symbol("S1")
+    kinetic_law.expanded_formula = sympy.Symbol("k") * sympy.Symbol("S1")  # type: ignore
     kinetic_law.symbols = ["k", "S1"]
     reaction.reactants = []
     reaction.products = []
@@ -364,7 +364,7 @@ class TestMain(unittest.TestCase):
         with patch.object(sys, "argv", ["prog", "--first_model_num", "5",
                                         "--last_model_num", "2",
                                         "--output", self.output_path]), \
-             redirect_stderr(stderr):
+                    redirect_stderr(stderr):
             with self.assertRaises(SystemExit) as ctx:
                 m.main()
         self.assertEqual(ctx.exception.code, 1)

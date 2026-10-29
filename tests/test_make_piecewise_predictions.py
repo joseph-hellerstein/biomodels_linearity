@@ -73,7 +73,7 @@ class TestProcessModel(unittest.TestCase):
         result = processModel(
             item=item,
             max_changepoint=0,
-            coefficient_threshold=COEFFICIENT_THRESHOLD,
+            coefficient_threshold=cn.DEF_COEFFICIENT_THRESHOLD,
         )
         self.assertIsInstance(result, pd.DataFrame)
         self.assertGreater(len(cast(pd.DataFrame, result)), 0)
@@ -113,7 +113,7 @@ class TestProcessModel(unittest.TestCase):
         result = processModel(
             item=item,
             max_changepoint=0,
-            coefficient_threshold=COEFFICIENT_THRESHOLD,
+            coefficient_threshold=cn.DEF_COEFFICIENT_THRESHOLD,
         )
         result = cast(pd.DataFrame, result)
         self.assertEqual(result[cn.COL_SYSTEM_ID].iloc[0], "BIOMD0000009999")
@@ -124,7 +124,7 @@ class TestProcessModel(unittest.TestCase):
         result = processModel(
             item=item,
             max_changepoint=0,
-            coefficient_threshold=COEFFICIENT_THRESHOLD,
+            coefficient_threshold=cn.DEF_COEFFICIENT_THRESHOLD,
         )
         result = cast(pd.DataFrame, result)
         self.assertIn(cn.COL_AGGREGATION_TYPE, result.columns)
@@ -143,7 +143,7 @@ class TestProcessModel(unittest.TestCase):
             result = processModel(
                 item=item,
                 max_changepoint=0,
-                coefficient_threshold=COEFFICIENT_THRESHOLD,
+                coefficient_threshold=cn.DEF_COEFFICIENT_THRESHOLD,
             )
         self.assertIsNone(result)
 
@@ -160,7 +160,7 @@ class TestProcessModel(unittest.TestCase):
             result = processModel(
                 item=item,
                 max_changepoint=0,
-                coefficient_threshold=COEFFICIENT_THRESHOLD,
+                coefficient_threshold=cn.DEF_COEFFICIENT_THRESHOLD,
             )
         self.assertIsNone(result)
 
@@ -194,7 +194,7 @@ class TestMain(unittest.TestCase):
                 first_model_num=0,
                 last_model_num=len(model_names),
                 is_initialize=is_initialize,
-                coefficient_threshold=COEFFICIENT_THRESHOLD,
+                coefficient_threshold=cn.DEF_COEFFICIENT_THRESHOLD,
                 output_path=output_path,
             )
 
