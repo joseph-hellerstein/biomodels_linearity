@@ -11,7 +11,7 @@ import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 from typing import Union, List, Any, cast
 
-OUTPUT_PATH = os.path.join(cn.DATA_DIR, "psd_prediction_analyzer_output.csv")
+OUTPUT_PATH_PAT = os.path.join(cn.DATA_DIR, "psd_prediction_analyzer__minaccuracy_%s__accuracystat_%s__.csv")
 
 
 class PSDPredictionAnalyzer:
@@ -151,32 +151,42 @@ class PSDPredictionAnalyzer:
         return pd.DataFrame(grouped_df)
 
     @classmethod
-    def makeBestPSDModelDF(cls, min_accuarcy: float = cn.DEF_MIN_ACCURACY,
+    def makeBestPSDModelDF(cls, min_accuracy: float = cn.DEF_MIN_ACCURACY,
             accuracy_stat: str = cn.DEF_ACCURACY_STAT,
-            output_path: str = OUTPUT_PATH,
+            output_path_pat: str = OUTPUT_PATH_PAT,
             ) -> pd.DataFrame:
         """Create the best PSD models for all models meeting the minimum accuracy threshold.
 
         Args:
-            min_accuarcy (float): The minimum accuracy threshold for predictions to be considered valid.
-            output_path (str): The path to save the output CSV file containing the best PSD models.
+            min_accuaracy (float): The minimum accuracy threshold for predictions to be considered valid.
+            output_path_pat (str): The path pattern for saving the output CSV file containing the best PSD models.
+                or a plain file path if no formatting is needed.
+            accuracy_stat (str): The accuracy statistic to use for determining the best models.
 
         Returns:
             pd.DataFrame: A DataFrame containing the best PSD models and their associated metadata.
         """
+        try:
+            output_path = output_path_pat % (str(min_accuracy), accuracy_stat)
+        except TypeError:
+            output_path = output_path_pat
+        #
         if os.path.exists(output_path):
-            return pd.read_csv(output_path)
+            print(f"Output file already exists at {output_path}. Loading it instead of generating a new one.")
+            df = pd.read_csv(output_path)
+            return df.reset_index()
         #
         t_iter = TimecourseIterator()
         sers: List[pd.Series] = []
+        best_model_df = pd.DataFrame()
         for item in t_iter:
-            analyzer = PSDPredictionAnalyzer(item.model_name, min_accuracy=min_accuarcy,
+            analyzer = PSDPredictionAnalyzer(item.model_name, min_accuracy=min_accuracy,
                     accuracy_stat=accuracy_stat)
             sers.append(cast(pd.Series, analyzer.best_model_ser))
+            best_model_df = pd.concat(sers, axis=1).T
+            best_model_df.to_csv(output_path, index=False)
         # Save the results to the specified output path
-        best_model_df = pd.concat(sers, axis=1).T
-        best_model_df.to_csv(output_path, index=False)
-        return best_model_df
+        return best_model_df.reset_index()
 
     @classmethod
     def plotBestLinearFits(cls,

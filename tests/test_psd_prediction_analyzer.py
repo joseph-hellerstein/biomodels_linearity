@@ -338,7 +338,7 @@ class TestMakeBestPSDModelDF(unittest.TestCase):
                    return_value=self._fake_timecourse_items(model_names)), \
              patch.object(PSDPredictionFileIterator, "query", side_effect=fake_query):
             return PSDPredictionAnalyzer.makeBestPSDModelDF(  # type: ignore
-                output_path=output_path, **kwargs)
+                output_path_pat=output_path, **kwargs)
 
     # ------------------------------------------------------------------
     # happy path
@@ -384,12 +384,12 @@ class TestMakeBestPSDModelDF(unittest.TestCase):
         ])
         output_path = os.path.join(self._tmpdir.name, "out.csv")
         result = self._run(base_df, ["BIOMD0000000005", "BIOMD0000000010"],
-                           output_path=output_path)
+                output_path=output_path)
         self.assertTrue(os.path.exists(output_path))
         csv_df = pd.read_csv(output_path)
         self.assertEqual(csv_df[cn.COL_SYSTEM_ID].tolist(),
-                         result[cn.COL_SYSTEM_ID].tolist())
-        self.assertAlmostEqual(csv_df.loc[0, cn.COL_AUC], 0.2)
+                result[cn.COL_SYSTEM_ID].tolist())
+        self.assertAlmostEqual(float(csv_df.loc[0, cn.COL_AUC]), 0.2) # type: ignore
 
     def test_returns_cached_csv_when_output_exists(self) -> None:
         """If output_path already exists, the cached CSV is returned as-is."""
@@ -411,9 +411,9 @@ class TestMakeBestPSDModelDF(unittest.TestCase):
             _row(system_id="BIOMD0000000005", auc=0.9, p50=0.9),  # qualifies at 0.8
             _row(system_id="BIOMD0000000005", auc=0.2, p50=0.1),  # fails at 0.8
         ])
-        strict = self._run(base_df, ["BIOMD0000000005"], min_accuarcy=0.8)
+        strict = self._run(base_df, ["BIOMD0000000005"], min_accuracy=0.8)
         self.assertAlmostEqual(strict[cn.COL_AUC].iloc[0], 0.9)
-        lenient = self._run(base_df, ["BIOMD0000000005"], min_accuarcy=0.0)
+        lenient = self._run(base_df, ["BIOMD0000000005"], min_accuracy=0.0)
         self.assertAlmostEqual(lenient[cn.COL_AUC].iloc[0], 0.2)
 
     def test_accuracy_stat_affects_selection(self) -> None:
@@ -423,20 +423,20 @@ class TestMakeBestPSDModelDF(unittest.TestCase):
             _row(system_id="BIOMD0000000005", auc=0.9, p50=0.9, mean=0.9),  # qualifies on mean
         ])
         by_mean = self._run(base_df, ["BIOMD0000000005"],
-                            min_accuarcy=0.8, accuracy_stat="mean")
+                            min_accuracy=0.8, accuracy_stat="mean")
         self.assertAlmostEqual(by_mean[cn.COL_AUC].iloc[0], 0.9)
         by_p50 = self._run(base_df, ["BIOMD0000000005"],
-                           min_accuarcy=0.8, accuracy_stat="p50")
+                           min_accuracy=0.8, accuracy_stat="p50")
         self.assertAlmostEqual(by_p50[cn.COL_AUC].iloc[0], 0.2)
 
     # ------------------------------------------------------------------
     # error paths
     # ------------------------------------------------------------------
 
-    def test_empty_model_list_raises(self) -> None:
-        """With no models to iterate, pd.concat has nothing and raises ValueError."""
-        with self.assertRaises(ValueError):
-            self._run(pd.DataFrame([self._qualifying_row("BIOMD0000000005", 0.2)]), [])
+    def test_empty_model_list_returns_empty_dataframe(self) -> None:
+        """With no models to iterate, the result should be an empty DataFrame."""
+        result = self._run(pd.DataFrame([self._qualifying_row("BIOMD0000000005", 0.2)]), [])
+        self.assertTrue(result.empty)
 
 
 # ---------------------------------------------------------------------------
