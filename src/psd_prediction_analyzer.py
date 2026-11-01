@@ -7,6 +7,7 @@ from src.piecewise_system_discovery import PiecewiseSystemDiscovery  # type: ign
 from src.timecourse_iterator import TimecourseIterator  # type: ignore
 
 import os
+import matplotlib.pyplot as plt  # type: ignore
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 from typing import Union, List, Any, cast
@@ -186,7 +187,8 @@ class PSDPredictionAnalyzer:
             best_model_df = pd.concat(sers, axis=1).T
             best_model_df.to_csv(output_path, index=False)
         # Save the results to the specified output path
-        return best_model_df.reset_index()
+        best_model_df = best_model_df.reset_index()
+        return best_model_df
 
     @classmethod
     def plotBestLinearFits(cls,
@@ -212,3 +214,22 @@ class PSDPredictionAnalyzer:
                     data_dir=data_dir)
             psd = analyzer.makeBestPSD()
             psd.plotPiecewise(is_changepoint_plot=True, legend=False, num_true_point=60, is_nochangepoint_plot=False)
+
+    @classmethod
+    def makeAUCCDFPlots(cls, min_accuracy: float = cn.DEF_MIN_ACCURACY) -> None:
+        """Creates 3 CDF plots of AUC values for accuracy statistics min, median, max.
+
+        Args:
+            min_accuracy (float): The minimum accuracy threshold for predictions to be considered valid.
+        """
+        for accuracy_statistic in [cn.COL_MIN, cn.COL_P50, cn.COL_MAX]:
+            best_model_df = cls.makeBestPSDModelDF(min_accuracy=min_accuracy,
+                    accuracy_stat=accuracy_statistic)
+            auc_values = best_model_df[cn.COL_AUC].to_numpy()
+            auc_values = np.sort(auc_values)
+            fraction_model = np.arange(1, len(auc_values) + 1) / len(auc_values)
+            plt.plot(auc_values, fraction_model)
+        #
+        plt.xlabel("AUC")
+        plt.ylabel("fraction of models")
+        plt.legend(["Min", "Median", "Max"])

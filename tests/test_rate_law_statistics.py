@@ -1,7 +1,8 @@
 """Tests for scripts/rate_law_statistics.py.
 
 The script classifies each reaction's kinetic law in a BioModels SBML model
-using the SBMLKinetics 2DK scheme and writes per-model counts to a CSV. These
+using the SBMLKinetics 2DK scheme and writes per-model counts and
+reaction-name lists to a CSV. These
 tests cover:
 
 * ``getModelName`` / ``getModelPath`` -- pure path/name helpers.
@@ -10,10 +11,13 @@ tests cover:
 * ``makeRow`` -- CSV row construction from a stats dict.
 * ``readModel`` / ``getFunctionDefinitions`` -- SBML parsing helpers, using a
   minimal model built with libsbml.
-* ``classifyReaction`` -- check ordering, first-match-wins, and tolerance of
-  checks that raise, using a mock ``Reaction``.
+* ``totalStoichiometry`` -- stoichiometry summation with the SBML default of 1.
+* ``classifyReaction`` -- check ordering, first-match-wins, tolerance of
+  checks that raise, and UNDR/BIDR subdivision by total stoichiometry, using a
+  mock ``Reaction``.
 * ``analyzeModel`` -- end-to-end classification of the minimal libsbml model
-  (one reaction with law ``k*S1``, one without a kinetic law).
+  (one reaction with law ``k*S1``, one without a kinetic law), including the
+  per-type reaction-name lists.
 * ``main`` -- CLI orchestration over temporary directories with
   ``analyzeModel`` mocked, so no real BioModels data is required.
 """
@@ -43,13 +47,16 @@ import src.constants as cn  # noqa: E402
 def _stats(**overrides) -> dict:
     """Build an analyzeModel-style stats dict with sensible defaults."""
     counts = {label: 0 for label in m.K_TYPE_LABELS}
-    counts["UNDR"] = 1
+    counts["UNDR1"] = 1
+    reactions = {label: [] for label in m.K_TYPE_LABELS}
+    reactions["UNDR1"] = ["R1"]
     base = {
         "species_count": 2,
         "reaction_count": 3,
         "reactions_with_kinetic_law": 2,
         "reactions_without_kinetic_law": 1,
         "rate_law_counts": counts,
+        "rate_law_reactions": reactions,
     }
     base.update(overrides)
     return base
@@ -94,18 +101,29 @@ def _write_minimal_sbml(tmpdir: str, filename: str = "model.xml") -> str:
     return path
 
 
-def _make_reaction(checks: dict) -> MagicMock:
+def _species_ref(species_id: str, stoich: float = 1.0) -> MagicMock:
+    """Build a mock SpeciesReference with the given id and stoichiometry."""
+    ref = MagicMock()
+    ref.getSpecies.return_value = species_id
+    ref.getStoichiometry.return_value = stoich
+    return ref
+
+
+def _make_reaction(checks: dict, reactants: list | None = None,
+                   products: list | None = None) -> MagicMock:
     """Build a mock Reaction whose kinetic-law checks return the given values.
 
     ``checks`` maps check method names (e.g. "isUNDR") to either a return
     value or an Exception instance to raise. Checks not listed return False.
+    ``reactants`` and ``products`` are mock SpeciesReference lists (default:
+    empty).
     """
     reaction = MagicMock()
     kinetic_law = reaction.kinetic_law
     kinetic_law.expanded_formula = sympy.Symbol("k") * sympy.Symbol("S1")  # type: ignore
     kinetic_law.symbols = ["k", "S1"]
-    reaction.reactants = []
-    reaction.products = []
+    reaction.reactants = reactants if reactants is not None else []
+    reaction.products = products if products is not None else []
     for _, method_name in m.K_TYPE_CHECKS:
         value = checks.get(method_name, False)
         if isinstance(value, Exception):
@@ -208,13 +226,27 @@ class TestMakeRow(unittest.TestCase):
     def test_row_values_match_stats(self) -> None:
         row = m.makeRow(5, _stats())
         self.assertEqual(row[cn.COL_MODEL_NUM], 5)
-        self.assertEqual(row[cn.COL_MODEL_NAME], "BIOMD0000000005")
+        self.assertEqual(row[cn.COL_SYSTEM_ID], "BIOMD0000000005")
         self.assertEqual(row[cn.COL_NUM_SPECIES], 2)
         self.assertEqual(row[cn.COL_NUM_REACTION], 3)
         self.assertEqual(row["num_reaction_with_kinetic_law"], 2)
         self.assertEqual(row["num_reaction_without_kinetic_law"], 1)
-        self.assertEqual(row["UNDR"], 1)
+        self.assertEqual(row["UNDR1"], 1)
         self.assertEqual(row["ZERO"], 0)
+
+    def test_reaction_name_columns_are_comma_joined(self) -> None:
+        reactions = {label: [] for label in m.K_TYPE_LABELS}
+        reactions["UNDR1"] = ["R1", "R2"]
+        row = m.makeRow(5, _stats(rate_law_reactions=reactions))
+        self.assertEqual(row["UNDR1_reaction_names"], "R1,R2")
+
+    def test_empty_reaction_list_is_an_empty_string(self) -> None:
+        row = m.makeRow(5, _stats())
+        self.assertEqual(row["ZERO_reaction_names"], "")
+
+    def test_csv_columns_end_with_reaction_name_columns(self) -> None:
+        self.assertEqual(m.CSV_COLUMNS[-len(m.K_TYPE_LABELS):],
+                         m.REACTION_NAME_COLUMNS)
 
 
 # ---------------------------------------------------------------------------
@@ -289,12 +321,80 @@ class TestClassifyReaction(unittest.TestCase):
     def test_check_that_raises_is_skipped(self) -> None:
         reaction = _make_reaction({"isZerothOrder": ValueError("boom"),
                                    "isUNDR": True})
-        self.assertEqual(m.classifyReaction(reaction, [], {"S1"}), "UNDR")
+        # No reactants, so the total stoichiometry is not 1: UNDR2.
+        self.assertEqual(m.classifyReaction(reaction, [], {"S1"}), "UNDR2")
 
     def test_returns_na_when_all_checks_raise(self) -> None:
         checks = {name: ValueError("boom") for _, name in m.K_TYPE_CHECKS}
         reaction = _make_reaction(checks)
         self.assertEqual(m.classifyReaction(reaction, [], {"S1"}), m.NA)
+
+    def test_undr_with_single_reactant_is_undr1(self) -> None:
+        reaction = _make_reaction({"isUNDR": True},
+                                  reactants=[_species_ref("S1")])
+        self.assertEqual(m.classifyReaction(reaction, [], {"S1"}), "UNDR1")
+
+    def test_undr_with_two_reactants_is_undr2(self) -> None:
+        reaction = _make_reaction({"isUNDR": True},
+                                  reactants=[_species_ref("S1"),
+                                             _species_ref("S2")])
+        self.assertEqual(m.classifyReaction(reaction, [], {"S1", "S2"}),
+                         "UNDR2")
+
+    def test_undr_reactant_stoichiometry_is_counted(self) -> None:
+        # 2*S1 -> S2 has total reactant stoichiometry 2, so UNDR2.
+        reaction = _make_reaction({"isUNDR": True},
+                                  reactants=[_species_ref("S1", stoich=2.0)])
+        self.assertEqual(m.classifyReaction(reaction, [], {"S1"}), "UNDR2")
+
+    def test_bidr_with_one_reactant_and_one_product_is_bidr1(self) -> None:
+        reaction = _make_reaction({"isBIDR": True},
+                                  reactants=[_species_ref("S1")],
+                                  products=[_species_ref("S2")])
+        self.assertEqual(m.classifyReaction(reaction, [], {"S1", "S2"}),
+                         "BIDR1")
+
+    def test_bidr_with_two_reactants_is_bidr2(self) -> None:
+        reaction = _make_reaction({"isBIDR": True},
+                                  reactants=[_species_ref("S1"),
+                                             _species_ref("S2")],
+                                  products=[_species_ref("S3")])
+        self.assertEqual(m.classifyReaction(reaction, [], {"S1", "S2", "S3"}),
+                         "BIDR2")
+
+    def test_bidr_with_two_products_is_bidr2(self) -> None:
+        reaction = _make_reaction({"isBIDR": True},
+                                  reactants=[_species_ref("S1")],
+                                  products=[_species_ref("S2"),
+                                            _species_ref("S3")])
+        self.assertEqual(m.classifyReaction(reaction, [], {"S1", "S2", "S3"}),
+                         "BIDR2")
+
+    def test_bidr_product_stoichiometry_is_counted(self) -> None:
+        reaction = _make_reaction({"isBIDR": True},
+                                  reactants=[_species_ref("S1")],
+                                  products=[_species_ref("S2", stoich=2.0)])
+        self.assertEqual(m.classifyReaction(reaction, [], {"S1", "S2"}),
+                         "BIDR2")
+
+
+# ---------------------------------------------------------------------------
+# totalStoichiometry
+# ---------------------------------------------------------------------------
+
+class TestTotalStoichiometry(unittest.TestCase):
+    """Tests for summing species-reference stoichiometries."""
+
+    def test_empty_list_sums_to_zero(self) -> None:
+        self.assertEqual(m.totalStoichiometry([]), 0.0)
+
+    def test_missing_stoichiometry_defaults_to_one(self) -> None:
+        refs = [_species_ref("S1", stoich=float("nan"))]
+        self.assertEqual(m.totalStoichiometry(refs), 1.0)
+
+    def test_sums_stoichiometries(self) -> None:
+        refs = [_species_ref("S1", stoich=2.0), _species_ref("S2")]
+        self.assertEqual(m.totalStoichiometry(refs), 3.0)
 
 
 # ---------------------------------------------------------------------------
@@ -324,12 +424,21 @@ class TestAnalyzeModel(unittest.TestCase):
         self.assertEqual(stats["reactions_with_kinetic_law"], 1)
         self.assertEqual(stats["reactions_without_kinetic_law"], 1)
 
-    def test_simple_mass_action_reaction_is_classified_undr(self) -> None:
+    def test_simple_mass_action_reaction_is_classified_undr1(self) -> None:
         stats = self._analyze_minimal_model()
         counts = stats["rate_law_counts"]
-        self.assertEqual(counts["UNDR"], 1)
+        # S1 -> S2 has a single reactant with default stoichiometry 1.
+        self.assertEqual(counts["UNDR1"], 1)
         # Only the reaction with a kinetic law is classified.
         self.assertEqual(sum(counts.values()), 1)
+
+    def test_reaction_names_are_tracked_per_rate_law(self) -> None:
+        stats = self._analyze_minimal_model()
+        reactions = stats["rate_law_reactions"]
+        self.assertEqual(reactions["UNDR1"], ["R1"])
+        for label in m.K_TYPE_LABELS:
+            if label != "UNDR1":
+                self.assertEqual(reactions[label], [])
 
 
 # ---------------------------------------------------------------------------
