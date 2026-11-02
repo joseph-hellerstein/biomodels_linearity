@@ -6,8 +6,8 @@ A timecourse with duration $T$ is subdivided into a $M$ segments so that the
 original function is well approximated by piecewise linear functions on each segment.
 We use $s_i$ to denote the normalized size of the $i$-th segmentw. which is the original segment size divided by $T$.
 Clearly, $\sum_i s_i = 1$.
-The **segment curve** is a function $\psi (s)$, where $s$ is the segment size.
-$\psi (s)$ is the fraction of the timecourse that has a segment size $\leq s$.
+The **segment configuration** refers to the number of segments of each size.
+The **cumulative segment curve** is a function $\psi (s)$, where $s$ is the segment size, and its value is the fraction of the timecourse covered by segments of size $s$ or smaller.
 Let $\alpha$ denote the **area under the (segment) curve (AUC)**. This is calculated as $\sum_i s_i (1 - s_i)$, where $s_i (1 - s_i)$ is the contribution to $\alpha$ of the $i$-th segment.
 
 ## Properties of AUC
@@ -37,35 +37,14 @@ $$
 since $s_{m_1}, s_{m_2} < s_m$.
 So, $\alpha^{\prime} > \alpha$.
 
-### Bounds on AUC
+### Extreme Segment Configurations
 
-We construct two sets of $M$ segments that will yield $\alpha_L$, the AUC lower bound, and $alpha_H$, the AUC upper bound.
+We find the segment configurations that minimize and maximize $\alpha$.
 
-For the upper bound, $s_i = \frac{1}{M}$ and so 
-$$
-\alpha_H = M \frac{1}{M} (1 - \frac{1}{M}) = \frac{M-1}{M}
-$$
-Clearly, $lim_{M \rightarrow \infty} \alpha_H =1$.
+### Upper Bound
 
-For the lower bound, let $s^*$ be the size of the smallest segment permitted for the simulation data.
-We assume that as $M \rightarrow \infty$, $s^*, M s^* \rightarrow 0$. Our configuration of the segments is that
-there are $M-1$ segments of size $s^*$, and one segment of size $1 - (M-1)s^*$. For large $M$,
-$$
-lim_{M \rightarrow \infty} \alpha_L = (M -1) s^* (1 - s^*) + (1 - (M -1) s^*)(M -1) s^*
-= 0
-$$
-
-We begin with Claim 1: If we are given $M$ segments ${\bf s}$, then 
-$$
-\alpha_L \leq \alpha_{\bf s} \leq \alpha_{H}
-$$
-The proof is that for $0 \leq s_1 < s_2 \leq \frac{1}{2}$,
-$s_1 (1- s_1) < s_2 (1 - s_2)$, which is clear from the concave curve. So, the sum of these terms establishes the claim.
-
-Now we prove the lower bound. We convert ${\bf s}$ to ${\bf s}^{\prime}$ by having $s^{\prime}_i = min(s, 1-s)$. Note that $\alpha_{\bf s} = \alpha_{{\bf s}^{\prime}}$.
-Also, $s_{Li} \leq s^{\prime}_i$.
-
-For the upper bound, we use the method of LaGrange Multipliers.
+For the upper bound, we find a configuration that maximizes $\alpha$ if there are $M$ segments and segment sizes are in $[0, 1]$.
+We use the method of LaGrange Multipliers.
 $f ({\bf s}) = \sum_i s_i (1 - s_i)$ with the constraint that
 $g({\bf s} ) = \sum s_i = 1$ for $0 \leq s_i \leq 1$.
 The solution is obtained from the proportionality of the gradients.
@@ -75,9 +54,16 @@ $$
 $$
 From the constraint, we know that $M \frac{1 - \lambda}{2} = 1$ and so
 $\lambda = 1 - \frac{2}{M}$.
-So, we conclude that $s_i = \frac{1}{M},$
-which is ${\bf s}_H$.
+So, we conclude that $s_i = \frac{1}{M}.$
+$$
+\psi_H(s) = M \frac{1}{M}(1 - \frac{1}{M}) = (1 - \frac{1}{M})
+$$
+Note that $lim_{M \rightarrow \infty} \psi_H(s) = 1$
+That is, a segment configuration that maximizes AUC has $M$ segments of equal size.
 
-### Collections of changepoints of the same size may have different AUC
-
-This follow immediately from the calculation of $\alpha_L, \alpha_H$. For a large number of segments, AUC can be anywhere in the interval $(0, 1)$.
+### Lower Bound
+For the lower bound, we again consider $M$ segments. Here, $(M - 1)$ are small and the last one is large. That is,
+$$
+\psi_L(s) = \left( (M -1) s (1 - s ) + (1 - (M-1) s)(M-1)s \right)
+$$
+Observe that $lim_{s \rightarrow 0} \psi(s) \rightarrow 0$.

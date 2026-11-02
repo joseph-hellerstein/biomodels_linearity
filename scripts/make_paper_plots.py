@@ -3,16 +3,16 @@
 from src.biomodels_iterator import BiomodelsIterator
 import src.constants as cn
 from src.model import Model
+from src.perturbation_analyzer import PerturbationAnalyzer
+from src.piecewise_system_discovery import PiecewiseSystemDiscovery
+from src.psd_prediction_analyzer import PSDPredictionAnalyzer
 from src.score import Score
 from src.simulator import Simulator
 from src.system_discovery import discoverNetwork
-from src.perturbation_analyzer import PerturbationAnalyzer
 from src.timecourse import Timecourse
-from src.piecewise_system_discovery import PiecewiseSystemDiscovery
-from src.psd_prediction_analyzer import PSDPredictionAnalyzer
 
 IS_PLOT = False
-IS_ALL = False
+IS_ALL = True
 
 if not IS_PLOT:
     import matplotlib # type: ignore
@@ -81,14 +81,14 @@ def plotPerturbation(metric_name: str, threshold: float = 0.001, is_analyze_spec
 # Linear Fits
 ################################################
 ############### Time course ####################
-if IS_ALL:
+""" if IS_ALL:
     sdr = doPlot(968, species_names=["SOCS1", "IL7IL7RJAK1"])
     sdr.fig.savefig(os.path.join(cn.PAPER_DIR, "linear_fit_968.pdf"), bbox_inches="tight", dpi=300) # type: ignore
     ##
     sdr = doPlot(1004, species_names= ["IL6ext", "STAT3mRNA"])
     sdr.fig.savefig(os.path.join(cn.PAPER_DIR, "linear_fit_1004.pdf"), bbox_inches="tight", dpi=300) # type: ignore
-#
-############### CDFs ####################
+# """
+""" ############### CDFs ####################
 if IS_ALL:
     filename = os.path.join(cn.DATA_DIR, "linear_predictor_scores-0.001.csv")
     score = Score.deserialize(filename)
@@ -129,8 +129,8 @@ if IS_ALL:
             filename = f"perturbation_{aggregation}_{percentile}_cdf.pdf"
             fig.savefig(os.path.join(cn.PAPER_DIR, filename), bbox_inches="tight", dpi=300) # type: ignore
             plt.close()
-
-
+"""
+""" 
 ################################################
 # Perturbations
 ################################################
@@ -150,12 +150,37 @@ if IS_ALL:
             filename = f"piecewise_prediction_1045_{max_changepoint}_{max_fractional_reduction}_{max_changepoint}.pdf"
             path = os.path.join(cn.PAPER_DIR, filename)
             fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+"""
+#######################
+# Accuracy CDF and number of changepoints
+######################"
+if IS_ALL:
+    path = os.path.join(cn.PSD_DATA_DIR,
+            "piecewise_predictions__numpoint_100000__threshold_0.001__removal_0__manycp_1__repeat_1.csv")
+    df = pd.read_csv(path)
+    MAX_CHANGEPOINTS = [0, 5, 50, 500, 5000]
+    for idx, max_changepoint in enumerate(MAX_CHANGEPOINTS):
+        mask = df[cn.COL_MAX_CHANGEPOINT] == max_changepoint
+        mask &= df[cn.COL_AGGREGATION_TYPE] == cn.COL_AGGREGATION_TYPE_MODEL
+        values = np.sort(df[mask][cn.COL_P50].to_numpy())
+        _ = Score.plotCDFArray(values, is_plot=True)
+    legend = [f"{max_changepoint + 1} segments" for max_changepoint in MAX_CHANGEPOINTS]
+    legend[0] = "1 segment"
+    plt.legend(legend)
+    plt.ylabel("fraction of models")
+    filename = "piecewise_prediction_accuracy_cdf.pdf"
+    path = os.path.join(cn.PAPER_DIR, filename)
+    plt.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+    plt.close()
+
+
 
 ######################
 # AUC Distribution
 ######################
-if True:
+if IS_ALL:
     PSDPredictionAnalyzer.makeAUCCDFPlots()
     filename = "piecewise_auc_cdf.pdf"
     path = os.path.join(cn.PAPER_DIR, filename)
     plt.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+    plt.close()
