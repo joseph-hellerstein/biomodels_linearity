@@ -5,7 +5,7 @@ import pickle
 import tempfile
 import types
 import unittest
-from typing import Optional, cast, Any
+from typing import Optional, cast, Any, Union
 from unittest.mock import patch
 import matplotlib.pyplot as plt  # noqa: F401 -- non-interactive backend needed before pyplot
 #matplotlib.use("Agg")
@@ -803,11 +803,11 @@ class TestPlotBestLinearFits(unittest.TestCase):
         with open(path, "wb") as f:
             pickle.dump(df, f)
 
-    def _run(self, model_ids: list, **kwargs) -> None:
+    def _run(self, model_id: Union[str, int], **kwargs) -> None:
+        """Run the plotBestLinearFits method with the given model ID and additional keyword arguments."""
         if not "min_accuracy" in kwargs:
             kwargs["min_accuracy"] = 0.7
-        return PSDPredictionAnalyzer.plotBestLinearFits(  # type: ignore
-            model_ids, data_dir=self._tmpdir.name, **kwargs)
+        return PSDPredictionAnalyzer.plotBestLinearFits(model_id, data_dir=self._tmpdir.name, **kwargs)  # type: ignore
 
     # ------------------------------------------------------------------
     # per-model dispatch (plotPiecewise patched to record calls)
@@ -826,15 +826,14 @@ class TestPlotBestLinearFits(unittest.TestCase):
     def test_plots_each_model_in_list(self) -> None:
         plotted, patcher = self._record_plots()
         with patcher:
-            self._run([5, 10])
-        self.assertEqual(sorted(p.model_name for p in plotted), ["BIOMD0000000005", "BIOMD0000000010"])
+            self._run(10)
+        self.assertEqual(sorted(p.model_name for p in plotted), ["BIOMD0000000010"])
 
     def test_uses_each_models_own_best_changepoints(self) -> None:
         plotted, patcher = self._record_plots()
         with patcher:
-            self._run([5, 10])
+            self._run(10)
         by_name = {p.model_name: p.changepoints for p in plotted}
-        self.assertEqual(by_name["BIOMD0000000005"], [40])
         self.assertEqual(by_name["BIOMD0000000010"], [60])
 
     # ------------------------------------------------------------------
@@ -845,19 +844,19 @@ class TestPlotBestLinearFits(unittest.TestCase):
         """A row that qualifies at the default 0.8 but not at 0.9 must raise."""
         self._write_pkl(pd.DataFrame([_row(p50=0.85)]))  # qualifies at 0.8, not at 0.9
         with self.assertRaises(ValueError):
-            self._run([5], min_accuracy=0.9)
+            self._run(5, min_accuracy=0.9)
 
     def test_forwards_data_dir(self) -> None:
         """An empty data_dir has no predictions, so makeBestPSD must raise."""
         with tempfile.TemporaryDirectory() as empty_dir:  # type: ignore
             with self.assertRaises(ValueError):
                 PSDPredictionAnalyzer.plotBestLinearFits(  # type: ignore
-                    [5], data_dir=empty_dir)
+                    5, data_dir=empty_dir)
 
     def test_raises_value_error_when_no_valid_predictions(self) -> None:
         self._write_pkl(pd.DataFrame([_row(p50=0.1)]))  # p50=0.1 < default min_accuracy=0.8
         with self.assertRaises(ValueError):
-            self._run([5])
+            self._run(5)
 
 #@unittest.skipUnless(_HAS_PSD_DATA, f"real data file {_E2E_PKL!r} not present in data/")
 unittest.skipUnless(False,"Skipping regression tests for now; they are not passing.")

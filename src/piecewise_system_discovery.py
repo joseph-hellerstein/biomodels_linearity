@@ -31,6 +31,20 @@ ChangepointLookupResult = collections.namedtuple("ChangepointLookupResult",
         ["changepoints", "accuracy", "csv_path"])
 
 
+class ExtendedPlotOptions(PlotOptions):
+    def __init__(self, num_changepoint: int, auc : float,**kwargs):
+        super().__init__(**kwargs)
+        self.num_changepoint = num_changepoint
+        self.auc = auc
+
+    @classmethod
+    def makeFromPlotOptions(cls, num_changepoint: int, auc: float, po: PlotOptions) -> 'ExtendedPlotOptions':
+        return cls(num_changepoint=num_changepoint, auc=auc,
+            fig=po.fig, ax=po.ax, title=po.title, xlabel=po.xlabel,
+            ylabel=po.ylabel, legend=po.legend, xlim=po.xlim, ylim=po.ylim,
+            model_name=po.model_name)
+
+
 class PiecewiseSystemDiscovery(object):
     """Piecewise-linear ODE discovery across detected change-points."""
 
@@ -158,71 +172,6 @@ class PiecewiseSystemDiscovery(object):
                 f"{type(parsed).__name__}"
             )
         return [int(cp) for cp in parsed]
-
-    def _getChangepointsFromFile(
-            self, csv_path: str = cn.PIECEWISE_PREDICTIONS_MODEL_PATH,
-    ) -> List[ChangepointLookupResult]:
-        """Look up pre-computed changepoints in ``data/piecewise_predictions_model.csv``.
-
-        Matches every CSV row whose ``(system_id, max_changepoint,
-        max_fractional_reduction)`` equals ``(self.model_name,
-        self.max_changepoint, self.max_fractional_reduction)`` and returns
-        each matching row's ``changepoints`` column parsed back into a list
-        of ints. When multiple rows match, one inner list is returned per row,
-        in the order they appear in the CSV file.
-
-        Arguments
-        ---------
-        csv_path : str
-            Path to the CSV file containing pre-computed changepoints.
-        accuracy_col : str
-            Column name for the accuracy metric.
-
-        Returns
-        -------
-        list[ChangepointLookupResult]
-            A list of changepoint lists -- one per matching row -- when at
-            least one valid match is found.  An empty cell on a matching row
-            contributes an inner ``[]``.  Rows whose cell cannot be parsed via
-            :func:`ast.literal_eval` are silently skipped.  Returns []
-            only when (a) the CSV is missing, (b) no row matches the
-            three-key lookup, or (c) every matching row has an unparseable
-            ``changepoints`` cell.
-
-        Notes
-        -----
-        The CSV has no ``model_name`` column; we match against ``system_id``,
-        which holds values like ``"BIOMD0000000005"`` and is the only model
-        identifier in that file.
-        """
-        if os.path.exists(csv_path) is False:
-            return []
-
-        df = pd.read_csv(csv_path)
-        mask = (df[cn.COL_MAX_CHANGEPOINT] == self.max_changepoint) & \
-                (df[cn.COL_MAX_FRACTIONAL_REDUCTION] == self.max_fractional_reduction) & \
-                (df[cn.COL_SYSTEM_ID] == self.model_name)
-
-        if not mask.any():
-            return []
-
-        results: List[ChangepointLookupResult] = []
-        masked_df = df.loc[mask]
-        cp_series = masked_df[cn.COL_CHANGEPOINTS]
-        acc_series = masked_df[self.accuracy_col]
-
-        for i in range(len(masked_df)):
-            raw_cp = cp_series.iloc[i]
-            parsed = self.parseChangepointsCell(raw_cp, model_name=self.model_name)
-            accuracy = float(acc_series.iloc[i])
-            if np.isnan(accuracy):
-                raise ValueError(f"NaN accuracy in CSV for {self.model_name} at row {i}")
-            results.append(ChangepointLookupResult(parsed, accuracy, csv_path=csv_path))
-
-        # Sort by descending accuracy so callers see the best configuration first.
-        results.sort(key=lambda r: r.accuracy, reverse=True)
-
-        return results
 
     def _fitSegments(self, changepoints: List[int]) -> Tuple[List[SystemDiscovery],
             List[Tuple[float, float]], List[int]]:
@@ -833,7 +782,8 @@ class PiecewiseSystemDiscovery(object):
                 is_nochangepoint_plot: bool = True,
                 is_changepoint_plot: bool = True,
                 title_additional: str = "",
-                **plt_kwargs: Any) -> PlotOptions:
+                ax: Optional[plt.Axes] = None,  # type: ignore
+                **plt_kwargs: Any) -> ExtendedPlotOptions:
         """Two-panel comparison: 0 change points (top) vs max_changepoint (bottom).
 
         Both panels show actual (scatter) vs predicted (line) species concentrations.
@@ -848,6 +798,7 @@ class PiecewiseSystemDiscovery(object):
             List of species names to plot. If None, all species are plotted.
         suptitle : str
             Title for the entire figure.  Defaults to "Actual vs. Predicted".
+        ax : Optional[plt.Axes]
         is_nochangepoint_plot: bool
             Plot with no changepoints
         is_changepoint_plot: bool
@@ -864,6 +815,8 @@ class PiecewiseSystemDiscovery(object):
             Wraps the figure and the bottom axes.  Call ``plt.show()`` or
             ``po.fig.savefig(...)`` on the returned object as needed.
         """
+        
+        ##
         if species_names is None:
             species_names = self.species_names
         self._requireFitted()
@@ -876,19 +829,35 @@ class PiecewiseSystemDiscovery(object):
         num_skip = max(1, len(time_arr) // num_true_point)
 
         # Get baseline vs. piecewise scores and predictions; lazily build the whole-timecourse model.
-        sys_disc = self._getBaselineSystemDiscovery()
-        sys_disc_score = sys_disc.score()
-        sys_disc_pred_df = sys_disc.predict()
-        psd_score = self.score()
+        if is_nochangepoint_plot:
+            sys_disc = self._getBaselineSystemDiscovery()
+            sys_disc_score = sys_disc.score()
+            sys_disc_pred_df = sys_disc.predict()
+        else:
+            sys_disc = None
+            sys_disc_score = None
+            sys_disc_pred_df = None
+        if is_changepoint_plot:
+            psd_score = self.score()
+        else:
+            psd_score = None
         # Construct the plot
         if is_nochangepoint_plot and is_changepoint_plot:
             fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=figsize, sharex=True)
             plot_options = PlotOptions(fig=fig, ax=ax_bot, **plt_kwargs)
         elif is_nochangepoint_plot:
-            fig, ax_top = plt.subplots(1, 1, figsize=figsize, sharex=True)
+            if ax is not None:
+                ax_top = ax
+                fig = plt.gcf()
+            else:
+                fig, ax_top = plt.subplots(1, 1, figsize=figsize, sharex=True)
             plot_options = PlotOptions(fig=fig, ax=ax_top, **plt_kwargs)
         elif is_changepoint_plot:
-            fig, ax_bot = plt.subplots(1, 1, figsize=figsize, sharex=True)
+            if ax is not None:
+                ax_bot = ax
+                fig = plt.gcf()
+            else:
+                fig, ax_bot = plt.subplots(1, 1, figsize=figsize, sharex=True)
             plot_options = PlotOptions(fig=fig, ax=ax_bot, **plt_kwargs)
         else:
             raise ValueError("At least one of is_nochangepoint_plot or is_changepoint_plot must be True.")
@@ -945,6 +914,7 @@ class PiecewiseSystemDiscovery(object):
                     title=f"{self.num_changepoint} change points",
                     vlines=change_point_times,
                     auc=self.nl_curve.auc, **plt_kwargs)
+        plot_options = ExtendedPlotOptions.makeFromPlotOptions(self.num_changepoint, self.nl_curve.auc, plot_options)
         fig.suptitle(suptitle, fontsize=13, fontweight="bold")
         fig.tight_layout()
         return plot_options

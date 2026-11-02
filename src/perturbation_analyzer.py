@@ -100,7 +100,7 @@ class PerturbationAnalyzer:
         self.poly_degree = poly_degree
 
         # Default perturbations to the same list used by analyze_perturbations.
-        self.perturbations: list[float] = (
+        self.perturbations  = ( 
             perturbations if perturbations is not None else [-0.5, -0.2, -0.1, 0.0, 0.1, 0.2, 0.5]
         )
         # Do the analysis

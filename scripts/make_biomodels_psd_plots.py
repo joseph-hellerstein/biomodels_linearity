@@ -32,7 +32,7 @@ def main(first_model_num: int = 0, last_model_num: int = -1) -> None:
         except Exception as e:
             print(f"Could not process {item.model_name}: {e}")
             continue
-        po = psd.plotPiecewise(legend=False, num_true_point=60, is_nochangepoint_plot=False)
+        po = psd.plotPiecewise(num_true_point=60, is_nochangepoint_plot=False)
         path = os.path.join(PLOT_DIR, f"piecewise_{psd.model_num}.pdf")
         plt.savefig(path, bbox_inches="tight")
         plt.close(po.fig)

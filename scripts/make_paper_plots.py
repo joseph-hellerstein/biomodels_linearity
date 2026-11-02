@@ -11,8 +11,8 @@ from src.simulator import Simulator
 from src.system_discovery import discoverNetwork
 from src.timecourse import Timecourse
 
-IS_PLOT = False
-IS_ALL = True
+IS_PLOT = True
+IS_ALL = False
 
 if not IS_PLOT:
     import matplotlib # type: ignore
@@ -151,6 +151,18 @@ if IS_ALL:
             path = os.path.join(cn.PAPER_DIR, filename)
             fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
 """
+#######################
+# Examples of piecewise predictions
+#######################
+if True:
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    model_nums = [745, 904, 447, 697]
+    model_nums = [799, 799, 799, 799]    # test only
+    for idx, model_num in enumerate(model_nums):
+        ax = axes[idx // 2, idx % 2]
+        extended_plot_options = PSDPredictionAnalyzer.plotBestLinearFits(model_id=[model_num], ax=ax)
+        title = f"{model_num}: segments={extended_plot_options.num_changepoints + 1}, AUC={extended_plot_options.auc:.3f}"
+    plt.show()
 #######################
 # Accuracy CDF and number of changepoints
 ######################"

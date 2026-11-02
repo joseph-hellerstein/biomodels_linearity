@@ -3,14 +3,14 @@
 import src.constants as cn  # type: ignore
 from src.psd_prediction_file_iterator import PSDPredictionFileIterator  # type: ignore
 from src.model import Model  # type: ignore
-from src.piecewise_system_discovery import PiecewiseSystemDiscovery  # type: ignore
+from src.piecewise_system_discovery import PiecewiseSystemDiscovery, ExtendedPlotOptions  # type: ignore
 from src.timecourse_iterator import TimecourseIterator  # type: ignore
 
 import os
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
-from typing import Union, List, Any, cast
+from typing import Union, List, Any, cast, Optional
 
 OUTPUT_PATH_PAT = os.path.join(cn.DATA_DIR, "psd_prediction_analyzer__minaccuracy_%s__accuracystat_%s__.csv")
 
@@ -192,28 +192,29 @@ class PSDPredictionAnalyzer:
 
     @classmethod
     def plotBestLinearFits(cls,
-            model_ids: list[Union[str, int]],
+            model_id: Union[str, int],
             min_accuracy: float = cn.DEF_MIN_ACCURACY,
             accuracy_statistic: str = cn.DEF_ACCURACY_STAT,
             is_guard_filename: bool = True,
-            data_dir: str = cn.PSD_DATA_DIR) -> None:
+            ax: Optional[plt.Axes] = None,  # type: ignore
+            data_dir: str = cn.PSD_DATA_DIR) -> ExtendedPlotOptions:
         """
         Plots the best linear fits for a list of model IDs.
 
         Args:
-            model_ids (list[Union[str, int]]): A list of model identifiers (either numbers or names).
+            model_id (Union[str, int]): model identifier (either numbers or names).
             min_accuracy (float): The minimum accuracy threshold for predictions to be considered valid.
             accuracy_statistic (str): The statistic to use for accuracy calculations.
             is_guard_filename (bool): Whether to use the guard filename for the data files.
+            ax (Optional[plt.Axes]): The axes to plot on.
             data_dir (str): The directory containing the data files.    
         """
-        for model_id in model_ids:
-            analyzer = cls(model_id, min_accuracy=min_accuracy,
-                    accuracy_stat=accuracy_statistic,
-                    is_guard_filename=is_guard_filename,
-                    data_dir=data_dir)
-            psd = analyzer.makeBestPSD()
-            psd.plotPiecewise(is_changepoint_plot=True, legend=False, num_true_point=60, is_nochangepoint_plot=False)
+        analyzer = cls(model_id, min_accuracy=min_accuracy,
+                accuracy_stat=accuracy_statistic,
+                is_guard_filename=is_guard_filename,
+                data_dir=data_dir)
+        psd = analyzer.makeBestPSD()
+        return psd.plotPiecewise(is_changepoint_plot=True, legend=False, num_true_point=60, ax=ax, is_nochangepoint_plot=False)
 
     @classmethod
     def makeAUCCDFPlots(cls, min_accuracy: float = cn.DEF_MIN_ACCURACY) -> None:
