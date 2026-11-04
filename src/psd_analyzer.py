@@ -8,14 +8,15 @@ from src.timecourse_iterator import TimecourseIterator  # type: ignore
 
 import os
 import matplotlib.pyplot as plt  # type: ignore
+import matplotlib  # type: ignore
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
-from typing import Union, List, Any, cast, Optional
+from typing import Union, List, Any, cast, Optional, Tuple, Any
 
 OUTPUT_PATH_PAT = os.path.join(cn.DATA_DIR, "psd_prediction_analyzer__minaccuracy_%s__accuracystat_%s__.csv")
 
 
-class PSDPredictionAnalyzer:
+class PSDAnalyzer:
 
     def __init__(self, model_id: Union[str, int],
             min_accuracy : float = cn.DEF_MIN_ACCURACY,
@@ -181,7 +182,7 @@ class PSDPredictionAnalyzer:
         sers: List[pd.Series] = []
         best_model_df = pd.DataFrame()
         for item in t_iter:
-            analyzer = PSDPredictionAnalyzer(item.model_name, min_accuracy=min_accuracy,
+            analyzer = PSDAnalyzer(item.model_name, min_accuracy=min_accuracy,
                     accuracy_stat=accuracy_stat)
             sers.append(cast(pd.Series, analyzer.best_model_ser))
             best_model_df = pd.concat(sers, axis=1).T
@@ -244,33 +245,44 @@ class PSDPredictionAnalyzer:
 
     @classmethod
     def makeLongestSegmentCDFPlot(cls, min_accuracy: float = cn.DEF_MIN_ACCURACY,
-            accuracy_stat: str = cn.DEF_ACCURACY_STAT) -> pd.Series:
+            accuracy_stat: str = cn.DEF_ACCURACY_STAT, ax = None  # type: ignore
+            ) -> Tuple[pd.Series, Any]:
         """Creates a CDF plot of the longest segment lengths for the best PSD models.
 
         Args:
             min_accuracy (float): The minimum accuracy threshold for predictions to be considered valid.
             accuracy_stat (str): The statistic to use for accuracy calculations.
+            ax (matplotlib.Axes | None): The axes object to plot the CDF on. If None, a new axes object will be created.
 
         Returns:
-            pd.Series: A Series containing the longest segment lengths and their associated fractions.
+            pd.Series: A Series containing the longest segment lengths and the index is the system IDs
+            matplotlib.Axes: The axes object containing the CDF plot.
         """
         best_model_df = cls.makeBestPSDModelDF(min_accuracy=min_accuracy, accuracy_stat=accuracy_stat)
         # Calculate the longest segment from best models
         longest_segments: list = []
+        boundaries : List[int] | None
         for _, row in best_model_df.iterrows():
-            boundaries = row[cn.COL_BOUNDARIES]
+            # Parse the changepoints from the row
+            boundaries = PiecewiseSystemDiscovery.parseChangepointsCell(row[cn.COL_BOUNDARIES])
+            if boundaries is None:
+                continue
             longest_segment = (np.diff(np.array(boundaries))).max()
             longest_segments.append(longest_segment)
         ser = pd.Series(longest_segments, name="Longest Segment Length", index=best_model_df[cn.COL_SYSTEM_ID]).sort_values()
-        ser = ser / best_model_df.iloc[0][cn.COL_BOUNDARIES].max()  # Normalize by the maximum boundary value
+        ser = ser / cn.NUM_POINT
         ser = ser.sort_values()
         # Construct the plot
-        ser.index = np.arange(1, len(longest_segments) + 1) / len(longest_segments)
-        plt.plot(longest_segments, ser.index)
-        plt.grid(True)
-        plt.xlabel("longest segment (normalized) length")
-        plt.ylabel("fraction of models")
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
+        fraction = np.arange(0, len(ser)) / len(ser)
+        if ax is None:
+            _, ax = plt.subplots()
+        if ax is None:
+            raise ValueError("Axes object is None. Cannot plot the CDF.")
+        ax.plot(ser, fraction)
+        ax.grid(True)
+        ax.set_xlabel("normalized longest segment")
+        ax.set_ylabel("fraction of models")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
         #
-        return ser
+        return ser, ax

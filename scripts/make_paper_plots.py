@@ -5,7 +5,7 @@ import src.constants as cn
 from src.model import Model
 from src.perturbation_analyzer import PerturbationAnalyzer
 from src.piecewise_system_discovery import PiecewiseSystemDiscovery
-from src.psd_prediction_analyzer import PSDPredictionAnalyzer
+from src.psd_analyzer import PSDAnalyzer
 from src.score import Score
 from src.simulator import Simulator
 from src.system_discovery import discoverNetwork
@@ -157,12 +157,12 @@ if IS_ALL:
 #######################
 model_nums = [799, 799, 799, 799]    # test only
 model_nums = [745, 904, 821, 697]
-if True:
+if IS_ALL:
     t_fig, t_axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
     extended_plot_options_list: list = []
     for idx, model_num in enumerate(model_nums):
         ax = t_axes[idx]
-        extended_plot_options = PSDPredictionAnalyzer.plotBestLinearFits(model_id=model_num, ax=ax,
+        extended_plot_options = PSDAnalyzer.plotBestLinearFits(model_id=model_num, ax=ax,
                 min_accuracy=0.8, accuracy_statistic="p50", num_true_point=15)
         extended_plot_options_list.append(extended_plot_options)
         text = "1 segment" if extended_plot_options.num_changepoint == 0 else f"{extended_plot_options.num_changepoint + 1} segments"
@@ -197,6 +197,18 @@ if True:
     c_fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
     plt.close()
 
+########################
+# Distribution of longest segment for models with different min_accuarcy
+########################
+if True:
+    _, ax = PSDAnalyzer.makeLongestSegmentCDFPlot(min_accuracy=0.8, accuracy_stat="p50")
+    _, _ = PSDAnalyzer.makeLongestSegmentCDFPlot(min_accuracy=0.9, accuracy_stat="p50", ax=ax)
+    ax.legend(["min_accuracy=0.8", "min_accuracy=0.9"])
+    filename = "psd_longest_segment_cdf.pdf"
+    path = os.path.join(cn.PAPER_DIR, filename)
+    plt.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+    plt.close()
+
 #######################
 # Accuracy CDF and number of changepoints
 ######################"
@@ -225,7 +237,7 @@ if IS_ALL:
 # AUC Distribution
 ######################
 if IS_ALL:
-    PSDPredictionAnalyzer.makeAUCCDFPlots()
+    PSDAnalyzer.makeAUCCDFPlots()
     filename = "piecewise_auc_cdf.pdf"
     path = os.path.join(cn.PAPER_DIR, filename)
     plt.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore

@@ -1,7 +1,7 @@
 """Makes plots of biomodels fits to 'best' changepoints."""
 
 from src.timecourse_iterator import TimecourseIterator  # type: ignore
-from src.psd_prediction_analyzer import PSDPredictionAnalyzer  # type: ignore
+from src.psd_analyzer import PSDAnalyzer  # type: ignore
 
 import argparse
 import matplotlib  # type: ignore
@@ -26,7 +26,7 @@ def main(first_model_num: int = 0, last_model_num: int = -1) -> None:
             is_report=True)
     for item in t_iter:
         try:
-            analyzer = PSDPredictionAnalyzer(item.model_name,
+            analyzer = PSDAnalyzer(item.model_name,
                     timecourse_df=item.timecourse.timecourse_df)
             psd = analyzer.makeBestPSD()
         except Exception as e:

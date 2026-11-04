@@ -18,8 +18,8 @@ import src.constants as cn  # type: ignore
 from src.piecewise_system_discovery import (  # type: ignore
     PiecewiseSystemDiscovery,
 )
-from src.psd_prediction_analyzer import (  # type: ignore
-    PSDPredictionAnalyzer,
+from src.psd_analyzer import (  # type: ignore
+    PSDAnalyzer,
 )
 from src.timecourse_iterator import TimecourseIterator  # type: ignore
 from src.psd_prediction_file_iterator import PSDPredictionFileIterator  # type: ignore
@@ -93,29 +93,29 @@ class TestPSDPredictionAnalyzerInit(unittest.TestCase):
         self._tmpdir.cleanup()
 
     def test_model_num_and_name_stored(self) -> None:
-        analyzer = PSDPredictionAnalyzer(model_id=5, data_dir=self._tmpdir.name,
+        analyzer = PSDAnalyzer(model_id=5, data_dir=self._tmpdir.name,
                 is_guard_filename=False, min_accuracy=0.5)  # type: ignore
         self.assertEqual(analyzer.model_num, 5)
         self.assertEqual(analyzer.model_name, "BIOMD0000000005")
 
     def test_model_name_stored_from_string(self) -> None:
-        analyzer = PSDPredictionAnalyzer(model_id="BIOMD0000000010", data_dir=self._tmpdir.name,
+        analyzer = PSDAnalyzer(model_id="BIOMD0000000010", data_dir=self._tmpdir.name,
                 is_guard_filename=False)  # type: ignore
         self.assertEqual(analyzer.model_num, 10)
         self.assertEqual(analyzer.model_name, "BIOMD0000000010")
 
     def test_data_dir_stored(self) -> None:
-        analyzer = PSDPredictionAnalyzer(model_id=5, data_dir="/path/to/data",
+        analyzer = PSDAnalyzer(model_id=5, data_dir="/path/to/data",
                 is_guard_filename=False)  # type: ignore
         self.assertEqual(analyzer.data_dir, "/path/to/data")
 
     def test_min_accuracy_default(self) -> None:
-        analyzer = PSDPredictionAnalyzer(model_id=5, data_dir=self._tmpdir.name,
+        analyzer = PSDAnalyzer(model_id=5, data_dir=self._tmpdir.name,
                 is_guard_filename=False)  # type: ignore
         self.assertAlmostEqual(analyzer.min_accuracy, 0.8)
 
     def test_custom_min_accuracy(self) -> None:
-        analyzer = PSDPredictionAnalyzer(is_guard_filename=False,  # type: ignore
+        analyzer = PSDAnalyzer(is_guard_filename=False,  # type: ignore
             model_id=5, min_accuracy=0.9, data_dir=self._tmpdir.name,  # type: ignore
         )
         self.assertEqual(analyzer.min_accuracy, 0.9)
@@ -139,7 +139,7 @@ class TestGetModelBestSer(unittest.TestCase):
             pkl_path = os.path.join(tmpdir, "piecewise_predictions__numpoint_100000__threshold_0.001__removal_0__manycp_1.pkl")
             with open(pkl_path, "wb") as f:
                 pickle.dump(df, f)
-            analyzer = PSDPredictionAnalyzer(min_accuracy=0.0,  # type: ignore
+            analyzer = PSDAnalyzer(min_accuracy=0.0,  # type: ignore
                 model_id=5, data_dir=tmpdir, is_guard_filename=False,  # type: ignore
             )
         self.assertIsInstance(analyzer.best_model_ser, pd.Series)
@@ -156,7 +156,7 @@ class TestGetModelBestSer(unittest.TestCase):
             pkl_path = os.path.join(tmpdir, "piecewise_predictions__numpoint_100000__threshold_0.001__removal_0__manycp_1.pkl")
             with open(pkl_path, "wb") as f:
                 pickle.dump(df, f)
-            analyzer = PSDPredictionAnalyzer(is_guard_filename=False,  # type: ignore
+            analyzer = PSDAnalyzer(is_guard_filename=False,  # type: ignore
                 model_id=5, data_dir=tmpdir, min_accuracy=0.7,  # type: ignore
             )
         self.assertAlmostEqual(analyzer.best_model_ser[cn.COL_AUC], 0.1) # type: ignore
@@ -172,7 +172,7 @@ class TestGetModelBestSer(unittest.TestCase):
             pkl_path = os.path.join(tmpdir, "piecewise_predictions__numpoint_100000__threshold_0.001__removal_0__manycp_1.pkl")
             with open(pkl_path, "wb") as f:
                 pickle.dump(df, f)
-            analyzer = PSDPredictionAnalyzer(min_accuracy=0.0,  # type: ignore
+            analyzer = PSDAnalyzer(min_accuracy=0.0,  # type: ignore
                 model_id=5, data_dir=tmpdir, is_guard_filename=False,  # type: ignore
             )
         self.assertAlmostEqual(analyzer.best_model_ser[cn.COL_AUC], 0.2)  # type: ignore
@@ -213,8 +213,8 @@ class TestMakeBestPSD(unittest.TestCase):
         with open(path, "wb") as f:
             pickle.dump(df, f)
 
-    def _make_analyzer(self, min_accuracy: float = 0.7) -> PSDPredictionAnalyzer:
-        return PSDPredictionAnalyzer(model_id=5, data_dir=self._tmpdir.name,  # type: ignore
+    def _make_analyzer(self, min_accuracy: float = 0.7) -> PSDAnalyzer:
+        return PSDAnalyzer(model_id=5, data_dir=self._tmpdir.name,  # type: ignore
                 is_guard_filename=False, min_accuracy=min_accuracy)
 
     def _make_best_psd(self, **row_override) -> PiecewiseSystemDiscovery:
@@ -334,10 +334,10 @@ class TestMakeBestPSDModelDF(unittest.TestCase):
                 df = dataframe_filter(df, {})
             return df.reset_index(drop=True)
 
-        with patch("src.psd_prediction_analyzer.TimecourseIterator",
+        with patch("src.psd_analyzer.TimecourseIterator",
                    return_value=self._fake_timecourse_items(model_names)), \
              patch.object(PSDPredictionFileIterator, "query", side_effect=fake_query):
-            return PSDPredictionAnalyzer.makeBestPSDModelDF(  # type: ignore
+            return PSDAnalyzer.makeBestPSDModelDF(  # type: ignore
                 output_path_pat=output_path, **kwargs)
 
     # ------------------------------------------------------------------
@@ -467,7 +467,7 @@ class TestAnalyzeAUCConsistency(unittest.TestCase):
         """Run analyzeAUCConsistency against the temp directory."""
         if data_dir is None:
             data_dir = self._tmpdir.name
-        analyzer = PSDPredictionAnalyzer(model_id=5, data_dir=data_dir, is_guard_filename=False,
+        analyzer = PSDAnalyzer(model_id=5, data_dir=data_dir, is_guard_filename=False,
                 min_accuracy=0.7)  # type: ignore
         return analyzer.analyzeAUCConsistency()
 
@@ -653,7 +653,7 @@ class TestAnalyzeAUCConsistencyEndToEnd(unittest.TestCase):
         cls._tmpdir.cleanup()  # type: ignore
 
     def _run(self) -> pd.DataFrame:
-        return PSDPredictionAnalyzer(
+        return PSDAnalyzer(
             model_id=5, data_dir=self._tmpdir.name, is_guard_filename=False,  # type: ignore
         ).analyzeAUCConsistency()
 
@@ -728,7 +728,7 @@ class TestAnalyzeAUCConsistencyEndToEndBiomd278(unittest.TestCase):
         cls._tmpdir.cleanup()  # type: ignore
 
     def _run(self) -> pd.DataFrame:
-        result = PSDPredictionAnalyzer(
+        result = PSDAnalyzer(
             model_id=278, data_dir=self._tmpdir.name,  is_guard_filename=False,  # type: ignore
         ).analyzeAUCConsistency()
         return result
@@ -807,7 +807,7 @@ class TestPlotBestLinearFits(unittest.TestCase):
         """Run the plotBestLinearFits method with the given model ID and additional keyword arguments."""
         if not "min_accuracy" in kwargs:
             kwargs["min_accuracy"] = 0.7
-        return PSDPredictionAnalyzer.plotBestLinearFits(model_id, data_dir=self._tmpdir.name, **kwargs)  # type: ignore
+        return PSDAnalyzer.plotBestLinearFits(model_id, data_dir=self._tmpdir.name, **kwargs)  # type: ignore
 
     # ------------------------------------------------------------------
     # per-model dispatch (plotPiecewise patched to record calls)
@@ -850,7 +850,7 @@ class TestPlotBestLinearFits(unittest.TestCase):
         """An empty data_dir has no predictions, so makeBestPSD must raise."""
         with tempfile.TemporaryDirectory() as empty_dir:  # type: ignore
             with self.assertRaises(ValueError):
-                PSDPredictionAnalyzer.plotBestLinearFits(  # type: ignore
+                PSDAnalyzer.plotBestLinearFits(  # type: ignore
                     5, data_dir=empty_dir)
 
     def test_raises_value_error_when_no_valid_predictions(self) -> None:
@@ -866,7 +866,7 @@ class TestBugs(unittest.TestCase):
     def test_bad_accuracy(self) -> None:
         """Accuracy of plot doesn't match the plots themselves."""
         return
-        analyzer = PSDPredictionAnalyzer(904)
+        analyzer = PSDAnalyzer(904)
         try:
             psd = analyzer.makeBestPSD()
             _ = psd.plotPiecewise(legend=False, num_true_point=60, is_nochangepoint_plot=False)
@@ -877,9 +877,37 @@ class TestBugs(unittest.TestCase):
     def test_bad_changepoint_selection(self) -> None:
         """Changepoints selected by makeBestPSD don't match the plots."""
         return
-        analyzer = PSDPredictionAnalyzer(5, min_accuracy=0.5, data_dir=cn.PSD_DATA_DIR, is_guard_filename=True)
+        analyzer = PSDAnalyzer(5, min_accuracy=0.5, data_dir=cn.PSD_DATA_DIR, is_guard_filename=True)
         psd = analyzer.makeBestPSD()
         result = psd.plotPiecewise(legend=False, num_true_point=60, is_nochangepoint_plot=False)
+
+   
+# ---------------------------------------------------------------------------
+# makeLongestSegmentCDFPlot is a class method that creates a CDF plot of the longest segment lengths
+#for the best PSD models.
+# It takes in two parameters: min_accuracy and accuracy_stat, which are used to filter the best
+# models based on their accuracy. The method returns a pandas
+# Series containing the longest segment lengths, with the index being the system IDs.
+# ---------------------------------------------------------------------------
+
+
+
+class TestMakeLongestSegmentCDFPlot(unittest.TestCase):
+    """Unit tests for the makeLongestSegmentCDFPlot classmethod.
+
+    TimecourseIterator.getTimecourse is mocked (it reads from a zip archive).
+    plotPiecewise either runs for real on the small synthetic timecourse or is
+    patched to record calls.
+    """
+
+    def test_basic_plot(self) -> None:
+        """Test that the method returns a pandas Series with the expected index and values."""
+        ser, _ = PSDAnalyzer.makeLongestSegmentCDFPlot(min_accuracy=0.8, accuracy_stat="p50")
+        plt.show()
+        self.assertIsInstance(ser, pd.Series)
+        self.assertTrue(all(isinstance(x, (int, float)) for x in ser.values))
+        self.assertTrue(all(isinstance(x, str) for x in ser.index))
+
 
 
 if __name__ == "__main__":
