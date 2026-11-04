@@ -259,13 +259,14 @@ class PSDPredictionAnalyzer:
         longest_segments: list = []
         for _, row in best_model_df.iterrows():
             boundaries = row[cn.COL_BOUNDARIES]
-            longest_segment = max(np.diff(boundaries))
+            longest_segment = (np.diff(np.array(boundaries))).max()
             longest_segments.append(longest_segment)
         ser = pd.Series(longest_segments, name="Longest Segment Length", index=best_model_df[cn.COL_SYSTEM_ID]).sort_values()
         ser = ser / best_model_df.iloc[0][cn.COL_BOUNDARIES].max()  # Normalize by the maximum boundary value
+        ser = ser.sort_values()
         # Construct the plot
-        fraction_model = np.arange(1, len(longest_segments) + 1) / len(longest_segments)
-        plt.plot(longest_segments, fraction_model)
+        ser.index = np.arange(1, len(longest_segments) + 1) / len(longest_segments)
+        plt.plot(longest_segments, ser.index)
         plt.grid(True)
         plt.xlabel("longest segment (normalized) length")
         plt.ylabel("fraction of models")
