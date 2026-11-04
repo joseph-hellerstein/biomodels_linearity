@@ -241,3 +241,35 @@ class PSDPredictionAnalyzer:
         plt.xlabel("AUC")
         plt.ylabel("fraction of models")
         plt.legend(["Min", "Median", "Max"])
+
+    @classmethod
+    def makeLongestSegmentCDFPlot(cls, min_accuracy: float = cn.DEF_MIN_ACCURACY,
+            accuracy_stat: str = cn.DEF_ACCURACY_STAT) -> pd.Series:
+        """Creates a CDF plot of the longest segment lengths for the best PSD models.
+
+        Args:
+            min_accuracy (float): The minimum accuracy threshold for predictions to be considered valid.
+            accuracy_stat (str): The statistic to use for accuracy calculations.
+
+        Returns:
+            pd.Series: A Series containing the longest segment lengths and their associated fractions.
+        """
+        best_model_df = cls.makeBestPSDModelDF(min_accuracy=min_accuracy, accuracy_stat=accuracy_stat)
+        # Calculate the longest segment from best models
+        longest_segments: list = []
+        for _, row in best_model_df.iterrows():
+            boundaries = row[cn.COL_BOUNDARIES]
+            longest_segment = max(np.diff(boundaries))
+            longest_segments.append(longest_segment)
+        ser = pd.Series(longest_segments, name="Longest Segment Length", index=best_model_df[cn.COL_SYSTEM_ID]).sort_values()
+        ser = ser / best_model_df.iloc[0][cn.COL_BOUNDARIES].max()  # Normalize by the maximum boundary value
+        # Construct the plot
+        fraction_model = np.arange(1, len(longest_segments) + 1) / len(longest_segments)
+        plt.plot(longest_segments, fraction_model)
+        plt.grid(True)
+        plt.xlabel("longest segment (normalized) length")
+        plt.ylabel("fraction of models")
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        #
+        return ser
