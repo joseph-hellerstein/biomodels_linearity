@@ -891,7 +891,7 @@ class TestBugs(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-
+@unittest.skipUnless(_HAS_E2E_DATA, f"real data file {_E2E_PKL!r} not present in data/")
 class TestMakeLongestSegmentCDFPlot(unittest.TestCase):
     """Unit tests for the makeLongestSegmentCDFPlot classmethod.
 
