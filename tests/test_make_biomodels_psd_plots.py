@@ -47,7 +47,7 @@ def _makeMockPSD(model_num: int = 1):
 
 
 def _makeMockAnalyzer(psd):
-    """Create a mock PSDPredictionAnalyzer whose makeBestPSD returns the given psd."""
+    """Create a mock PSDAnalyzer whose makeBestPSD returns the given psd."""
     analyzer = MagicMock()
     analyzer.makeBestPSD.return_value = psd
     return analyzer
@@ -66,7 +66,7 @@ class TestMain(unittest.TestCase):
         self._patcher.stop()
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
-    @patch("make_biomodels_psd_plots.PSDPredictionAnalyzer")
+    @patch("make_biomodels_psd_plots.PSDAnalyzer")
     @patch("make_biomodels_psd_plots.TimecourseIterator")
     def test_passes_model_range_to_iterator(self, mock_iter_class, mock_analyzer_class):
         """main() forwards the model range to TimecourseIterator with reporting on."""
@@ -81,7 +81,7 @@ class TestMain(unittest.TestCase):
         mock_iter_class.assert_called_once_with(first_model_num=5, last_model_num=10,
                 is_report=True)
 
-    @patch("make_biomodels_psd_plots.PSDPredictionAnalyzer")
+    @patch("make_biomodels_psd_plots.PSDAnalyzer")
     @patch("make_biomodels_psd_plots.TimecourseIterator")
     def test_saves_pdf_for_each_processed_model(self, mock_iter_class, mock_analyzer_class):
         """main() writes one non-empty PDF per successfully processed model."""
@@ -101,7 +101,7 @@ class TestMain(unittest.TestCase):
             self.assertTrue(os.path.isfile(path))
             self.assertGreater(os.path.getsize(path), 0)
 
-    @patch("make_biomodels_psd_plots.PSDPredictionAnalyzer")
+    @patch("make_biomodels_psd_plots.PSDAnalyzer")
     @patch("make_biomodels_psd_plots.TimecourseIterator")
     def test_creates_plot_dir_if_missing(self, mock_iter_class, mock_analyzer_class):
         """main() creates the plot directory when it does not exist."""
@@ -118,10 +118,10 @@ class TestMain(unittest.TestCase):
         self.assertTrue(os.path.isdir(nested_dir))
         self.assertTrue(os.path.isfile(os.path.join(nested_dir, "piecewise_5.pdf")))
 
-    @patch("make_biomodels_psd_plots.PSDPredictionAnalyzer")
+    @patch("make_biomodels_psd_plots.PSDAnalyzer")
     @patch("make_biomodels_psd_plots.TimecourseIterator")
     def test_constructs_analyzer_with_model_name(self, mock_iter_class, mock_analyzer_class):
-        """main() constructs a PSDPredictionAnalyzer per model with the item's timecourse."""
+        """main() constructs a PSDAnalyzer per model with the item's timecourse."""
         if IGNORE_TESTS:
             return
         items = [_makeMockItem("BIOMD0000000005"), _makeMockItem("BIOMD0000000010")]
@@ -138,7 +138,7 @@ class TestMain(unittest.TestCase):
             call("BIOMD0000000010", timecourse_df=ANY),
         ])
 
-    @patch("make_biomodels_psd_plots.PSDPredictionAnalyzer")
+    @patch("make_biomodels_psd_plots.PSDAnalyzer")
     @patch("make_biomodels_psd_plots.TimecourseIterator")
     def test_calls_plot_piecewise_with_expected_options(self, mock_iter_class,
             mock_analyzer_class):
@@ -155,7 +155,7 @@ class TestMain(unittest.TestCase):
         psd.plotPiecewise.assert_called_once_with(legend=False, num_true_point=60,
                 is_nochangepoint_plot=False)
 
-    @patch("make_biomodels_psd_plots.PSDPredictionAnalyzer")
+    @patch("make_biomodels_psd_plots.PSDAnalyzer")
     @patch("make_biomodels_psd_plots.TimecourseIterator")
     def test_closes_figures_after_saving(self, mock_iter_class, mock_analyzer_class):
         """main() leaves no open figures after processing."""
@@ -172,7 +172,7 @@ class TestMain(unittest.TestCase):
 
         self.assertEqual(len(plt.get_fignums()), 0)
 
-    @patch("make_biomodels_psd_plots.PSDPredictionAnalyzer")
+    @patch("make_biomodels_psd_plots.PSDAnalyzer")
     @patch("make_biomodels_psd_plots.TimecourseIterator")
     def test_empty_iterator_produces_no_plots(self, mock_iter_class, mock_analyzer_class):
         """main() does nothing when the iterator yields no models."""
@@ -185,7 +185,7 @@ class TestMain(unittest.TestCase):
         self.assertEqual(os.listdir(self._tmpdir), [])
         mock_analyzer_class.assert_not_called()
 
-    @patch("make_biomodels_psd_plots.PSDPredictionAnalyzer")
+    @patch("make_biomodels_psd_plots.PSDAnalyzer")
     @patch("make_biomodels_psd_plots.TimecourseIterator")
     def test_continues_when_analyzer_construction_fails(self, mock_iter_class,
             mock_analyzer_class):
@@ -201,7 +201,7 @@ class TestMain(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self._tmpdir, "piecewise_5.pdf")))
         self.assertTrue(os.path.isfile(os.path.join(self._tmpdir, "piecewise_10.pdf")))
 
-    @patch("make_biomodels_psd_plots.PSDPredictionAnalyzer")
+    @patch("make_biomodels_psd_plots.PSDAnalyzer")
     @patch("make_biomodels_psd_plots.TimecourseIterator")
     def test_continues_when_make_best_psd_fails(self, mock_iter_class, mock_analyzer_class):
         """main() skips models whose makeBestPSD fails and keeps going."""
@@ -219,7 +219,7 @@ class TestMain(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(self._tmpdir, "piecewise_10.pdf")))
 
     @patch("builtins.print")
-    @patch("make_biomodels_psd_plots.PSDPredictionAnalyzer")
+    @patch("make_biomodels_psd_plots.PSDAnalyzer")
     @patch("make_biomodels_psd_plots.TimecourseIterator")
     def test_reports_failure_to_stdout(self, mock_iter_class, mock_analyzer_class,
             mock_print):
