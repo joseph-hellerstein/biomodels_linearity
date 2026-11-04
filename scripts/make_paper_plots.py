@@ -10,6 +10,7 @@ from src.score import Score
 from src.simulator import Simulator
 from src.system_discovery import discoverNetwork
 from src.timecourse import Timecourse
+from src.cumulative_segment_curve import CumulativeSegmentCurve
 
 IS_PLOT = True
 IS_ALL = False
@@ -154,15 +155,48 @@ if IS_ALL:
 #######################
 # Examples of piecewise predictions
 #######################
+model_nums = [799, 799, 799, 799]    # test only
+model_nums = [745, 904, 821, 697]
 if True:
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-    model_nums = [745, 904, 447, 697]
-    model_nums = [799, 799, 799, 799]    # test only
+    t_fig, t_axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
+    extended_plot_options_list: list = []
     for idx, model_num in enumerate(model_nums):
-        ax = axes[idx // 2, idx % 2]
-        extended_plot_options = PSDPredictionAnalyzer.plotBestLinearFits(model_id=[model_num], ax=ax)
-        title = f"{model_num}: segments={extended_plot_options.num_changepoints + 1}, AUC={extended_plot_options.auc:.3f}"
-    plt.show()
+        ax = t_axes[idx]
+        extended_plot_options = PSDPredictionAnalyzer.plotBestLinearFits(model_id=model_num, ax=ax,
+                min_accuracy=0.8, accuracy_statistic="p50", num_true_point=15)
+        extended_plot_options_list.append(extended_plot_options)
+        text = "1 segment" if extended_plot_options.num_changepoint == 0 else f"{extended_plot_options.num_changepoint + 1} segments"
+        title = f"{model_num}: {text}"
+        ax.set_title(title)
+        if idx > 0:
+            ax.set_ylabel("")
+            ax.set_xlabel("")
+        ax.legend([])
+    filename = "example_timecourse.pdf"
+    path = os.path.join(cn.PAPER_DIR, filename)
+    t_fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+    plt.close()
+    # Do the segment curve
+    c_fig, c_axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
+    for idx, model_num in enumerate(model_nums):
+        extended_plot_options = extended_plot_options_list[idx]
+        ax = c_axes[idx]
+        boundaries = extended_plot_options.psd.boundaries
+        csc = CumulativeSegmentCurve(boundaries)
+        csc.plot(ax=ax)
+        title = f"AUC={extended_plot_options.auc:.2f}"
+        ax.set_title(title)
+        ax.set_xlabel("Normalized Segment Length")
+        ax.set_ylabel("Cumulative Area")
+        ax.legend([])
+        if idx > 0:
+            ax.set_ylabel("")
+            ax.set_xlabel("")
+    filename = "example_segment_curve_examples.pdf"
+    path = os.path.join(cn.PAPER_DIR, filename)
+    c_fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+    plt.close()
+
 #######################
 # Accuracy CDF and number of changepoints
 ######################"

@@ -197,7 +197,8 @@ class PSDPredictionAnalyzer:
             accuracy_statistic: str = cn.DEF_ACCURACY_STAT,
             is_guard_filename: bool = True,
             ax: Optional[plt.Axes] = None,  # type: ignore
-            data_dir: str = cn.PSD_DATA_DIR) -> ExtendedPlotOptions:
+            data_dir: str = cn.PSD_DATA_DIR,
+            **kwargs) -> ExtendedPlotOptions:
         """
         Plots the best linear fits for a list of model IDs.
 
@@ -208,13 +209,19 @@ class PSDPredictionAnalyzer:
             is_guard_filename (bool): Whether to use the guard filename for the data files.
             ax (Optional[plt.Axes]): The axes to plot on.
             data_dir (str): The directory containing the data files.    
+            kwargs: Additional keyword arguments to pass to the plotting function.
         """
         analyzer = cls(model_id, min_accuracy=min_accuracy,
                 accuracy_stat=accuracy_statistic,
                 is_guard_filename=is_guard_filename,
                 data_dir=data_dir)
+        if analyzer.best_model_ser is None:
+            raise ValueError(f"No valid PSD predictions found for model {analyzer.model_name} with min_accuracy {min_accuracy}.")
         psd = analyzer.makeBestPSD()
-        return psd.plotPiecewise(is_changepoint_plot=True, legend=False, num_true_point=60, ax=ax, is_nochangepoint_plot=False)
+        if "num_true_point" not in kwargs:
+            kwargs["num_true_point"] = 60
+        return psd.plotPiecewise(is_changepoint_plot=True, legend=False, ax=ax, is_nochangepoint_plot=False,
+                **kwargs)
 
     @classmethod
     def makeAUCCDFPlots(cls, min_accuracy: float = cn.DEF_MIN_ACCURACY) -> None:

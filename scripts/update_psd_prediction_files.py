@@ -24,7 +24,7 @@ import ast
 
 import src.constants as cn  # noqa: E402
 import src.util as util  # type: ignore
-from src.nl_curve import NLCurve # type: ignore
+from src.cumulative_segment_curve import CumulativeSegmentCurve # type: ignore
 from src.piecewise_system_discovery import PiecewiseSystemDiscovery  # type: ignore
 from src.psd_prediction_file_iterator import PSDPredictionFileIterator, PSDPredictionItem  # type: ignore
 
@@ -77,7 +77,7 @@ def _addAUCColumn(item: PSDPredictionItem) -> int:
 
     Note that this function may fail if the changepoints list is empty or invalid, in which case the caller should handle the exception.
     """
-    item.df[cn.COL_AUC] = item.df.apply(lambda row: NLCurve(row[cn.COL_BOUNDARIES], name=row[cn.COL_SYSTEM_ID]).auc, axis=1)
+    item.df[cn.COL_AUC] = item.df.apply(lambda row: CumulativeSegmentCurve(row[cn.COL_BOUNDARIES], name=row[cn.COL_SYSTEM_ID]).auc, axis=1)
     return len(item.df)
 
 ############################

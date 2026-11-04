@@ -12,12 +12,11 @@ from src.model import Model  # type: ignore
 from src.plot_options import PlotOptions  # type: ignore
 from src.system_discovery import SystemDiscovery, NULL_DF  # type: ignore
 import src.util as util     # type: ignore
-from src.nl_curve import NLCurve  # type: ignore
+from src.cumulative_segment_curve import CumulativeSegmentCurve  # type: ignore
 from src.score import Score  # type: ignore
 
 import ast
 import collections
-import os
 import re
 import matplotlib.pyplot as plt  # type: ignore
 import numpy as np  # type: ignore
@@ -32,14 +31,21 @@ ChangepointLookupResult = collections.namedtuple("ChangepointLookupResult",
 
 
 class ExtendedPlotOptions(PlotOptions):
-    def __init__(self, num_changepoint: int, auc : float,**kwargs):
+    def __init__(self, num_changepoint: int, auc : float,
+            baseline_accuracy: float, psd_accuracy: float, psd: 'PiecewiseSystemDiscovery', **kwargs):
         super().__init__(**kwargs)
         self.num_changepoint = num_changepoint
         self.auc = auc
+        self.baseline_accuracy = baseline_accuracy
+        self.psd_accuracy = psd_accuracy
+        self.psd = psd
 
     @classmethod
-    def makeFromPlotOptions(cls, num_changepoint: int, auc: float, po: PlotOptions) -> 'ExtendedPlotOptions':
+    def makeFromPlotOptions(cls, num_changepoint: int, auc: float, 
+            baseline_accuracy: float, psd_accuracy: float, psd: 'PiecewiseSystemDiscovery',
+            po: PlotOptions) -> 'ExtendedPlotOptions':
         return cls(num_changepoint=num_changepoint, auc=auc,
+            baseline_accuracy=baseline_accuracy, psd_accuracy=psd_accuracy, psd=psd,
             fig=po.fig, ax=po.ax, title=po.title, xlabel=po.xlabel,
             ylabel=po.ylabel, legend=po.legend, xlim=po.xlim, ylim=po.ylim,
             model_name=po.model_name)
@@ -116,11 +122,11 @@ class PiecewiseSystemDiscovery(object):
         return len(self._subsequence_models) - 1 if self._is_fitted else 0
 
     @property
-    def nl_curve(self) -> NLCurve:
+    def nl_curve(self) -> CumulativeSegmentCurve:
         """Return the nonlinear curve object for the whole timecourse."""
         if not self._is_fitted:
             raise RuntimeError("PiecewiseSystemDiscovery must be fit() before accessing nl_curve.")
-        result = NLCurve(self.boundaries, name=self.model_name)
+        result = CumulativeSegmentCurve(self.boundaries, name=self.model_name)
         return result
 
     @property
@@ -777,7 +783,6 @@ class PiecewiseSystemDiscovery(object):
         return "\n\n".join(block_list)
 
     def plotPiecewise(self, num_true_point: int = -1, 
-                suptitle="Actual vs. Predicted",
                 species_names: Optional[List[str]] = None,
                 is_nochangepoint_plot: bool = True,
                 is_changepoint_plot: bool = True,
@@ -844,21 +849,21 @@ class PiecewiseSystemDiscovery(object):
         # Construct the plot
         if is_nochangepoint_plot and is_changepoint_plot:
             fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=figsize, sharex=True)
-            plot_options = PlotOptions(fig=fig, ax=ax_bot, **plt_kwargs)
+            extended_plot_options = PlotOptions(fig=fig, ax=ax_bot, **plt_kwargs)
         elif is_nochangepoint_plot:
             if ax is not None:
                 ax_top = ax
                 fig = plt.gcf()
             else:
                 fig, ax_top = plt.subplots(1, 1, figsize=figsize, sharex=True)
-            plot_options = PlotOptions(fig=fig, ax=ax_top, **plt_kwargs)
+            extended_plot_options = PlotOptions(fig=fig, ax=ax_top, **plt_kwargs)
         elif is_changepoint_plot:
             if ax is not None:
                 ax_bot = ax
                 fig = plt.gcf()
             else:
                 fig, ax_bot = plt.subplots(1, 1, figsize=figsize, sharex=True)
-            plot_options = PlotOptions(fig=fig, ax=ax_bot, **plt_kwargs)
+            extended_plot_options = PlotOptions(fig=fig, ax=ax_bot, **plt_kwargs)
         else:
             raise ValueError("At least one of is_nochangepoint_plot or is_changepoint_plot must be True.")
         change_point_times = [start for start, _ in self._subsequence_boundaries[1:]]
@@ -914,10 +919,10 @@ class PiecewiseSystemDiscovery(object):
                     title=f"{self.num_changepoint} change points",
                     vlines=change_point_times,
                     auc=self.nl_curve.auc, **plt_kwargs)
-        plot_options = ExtendedPlotOptions.makeFromPlotOptions(self.num_changepoint, self.nl_curve.auc, plot_options)
-        fig.suptitle(suptitle, fontsize=13, fontweight="bold")
+        extended_plot_options = ExtendedPlotOptions.makeFromPlotOptions(self.num_changepoint, self.nl_curve.auc, 
+                cast(float, sys_disc_score), cast(float, psd_score), self, extended_plot_options)
         fig.tight_layout()
-        return plot_options
+        return extended_plot_options
 
     def printEquations(self) -> None:
         """Pretty-print the discovered ODE for each subsequence."""
