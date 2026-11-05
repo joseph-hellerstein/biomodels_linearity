@@ -907,6 +907,7 @@ class TestMakeLongestSegmentCDFPlot(unittest.TestCase):
         self.assertIsInstance(ser, pd.Series)
         self.assertTrue(all(isinstance(x, (int, float)) for x in ser.values))
         self.assertTrue(all(isinstance(x, str) for x in ser.index))
+        self.addClassCleanup(lambda: plt.close("all"))
 
 
 
