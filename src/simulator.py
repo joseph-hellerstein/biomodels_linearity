@@ -78,6 +78,7 @@ class Simulator(object):
             start_time: float = cn.START_TIME,
             num_point: int = cn.NUM_POINT,
             is_jacobian_collection: bool = False,
+            is_reaction_in_output: bool = False
             ) -> SimulationResult:
         """
         Simulates the model.
@@ -88,6 +89,7 @@ class Simulator(object):
             start_time (float): start time of the simulation.
             num_point (int): number of time points to simulate.
             is_jacobian_collection (bool): whether to collect Jacobians at each time point.
+            is_reaction_in_output (bool): whether to include reaction rates in the output timecourse.
 
         Returns:
             SimulationResult: _description_
@@ -102,7 +104,8 @@ class Simulator(object):
             model=model,
             start_time=start_time,
             end_time=end_time,
-            num_point=num_point)
+            num_point=num_point,
+            is_reaction_in_output=is_reaction_in_output)
         return simulator.simulate(is_jacobian_collection=is_jacobian_collection)
 
     def simulate(self, is_jacobian_collection: bool = False) -> SimulationResult:
