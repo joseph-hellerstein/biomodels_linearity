@@ -43,6 +43,7 @@ class Simulator(object):
         num_point: int = cn.NUM_POINT,
         perturbation_value_fraction: float = cn.PERTURBATION_VALUE_FRACTION,
         perturbation_species_fraction: float = cn.PERTURBATION_SPECIES_FRACTION,
+        is_reaction_in_output: bool = False,
         ) -> None:
         """
         Parameters
@@ -61,6 +62,8 @@ class Simulator(object):
             May be positive or negative.
         perturbation_species_fraction : float
             Fraction of non-zero initial values that are perturbed.
+        is_reaction_in_output : bool
+            Whether to include reaction rates in the output timecourse.
         """
         self.model = model
         self.start_time = start_time
@@ -68,6 +71,7 @@ class Simulator(object):
         self.num_point = num_point
         self.perturbation_value_fraction = perturbation_value_fraction
         self.perturbation_species_fraction = perturbation_species_fraction
+        self.is_reaction_in_output = is_reaction_in_output
 
     @classmethod
     def simulateBiomodel(cls, model_num: int, end_time: float=-1.0,
@@ -125,8 +129,14 @@ class Simulator(object):
             rr.simulate(0, self.start_time, 2)
 
         # Batch timecourse simulation
+        if self.is_reaction_in_output:
+            selections = ['time'] + rr.getFloatingSpeciesConcentrationIds()  \
+                    + rr.getReactionIds()
+        else:
+            selections = ['time'] + rr.getFloatingSpeciesConcentrationIds()
         try:
-            rr_result = rr.simulate(self.start_time, self.end_time, self.num_point)
+            rr_result = rr.simulate(self.start_time, self.end_time, self.num_point, 
+                    selections=selections)
         except Exception as e:
             raise ValueError(f"Simulation failed: {e}")
 

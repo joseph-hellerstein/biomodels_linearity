@@ -5,6 +5,7 @@ import re
 import sys
 import types
 import unittest
+from typing import List
 from unittest.mock import patch, MagicMock
 
 import numpy as np  # type: ignore
@@ -17,6 +18,8 @@ from simulator import Simulator, SimulationResult  # type: ignore
 from model import Model  # type: ignore
 
 HAS_BIOMODELS = os.path.isdir(cn.BIOMODELS_DIR)
+
+IGNORE_TESTS = False
 
 
 ANTIMONY_MODEL = """
@@ -50,6 +53,13 @@ def _make_model(antimony_str: str = ANTIMONY_MODEL, model_name: str = "test_mode
         _ASSIGNMENT_RULE_RE.findall(sbml_str)
     )
     return model
+
+
+def _get_reaction_ids(antimony_str: str = ANTIMONY_MODEL) -> List[str]:
+    """Get the reaction IDs of an Antimony model via RoadRunner."""
+    import tellurium as te  # type: ignore
+    rr = te.loada(antimony_str)
+    return list(rr.getReactionIds())
 
 
 class TestSimulationResult(unittest.TestCase):
@@ -235,6 +245,111 @@ class TestSimulatorSimulate(unittest.TestCase):
         # S2 starts at 0 and ends higher
         self.assertAlmostEqual(s2_values[0], 0.0, places=5)
         self.assertGreater(s2_values[-1], s2_values[0])
+
+
+class TestSimulatorReactionOutput(unittest.TestCase):
+    """Tests for Simulator.simulate() with is_reaction_in_output=True."""
+
+    def test_default_excludes_reaction_columns(self) -> None:
+        """Without is_reaction_in_output, only species columns are returned."""
+        if IGNORE_TESTS:
+            return
+        model = _make_model()
+        sim = Simulator(model=model, start_time=0.0, end_time=10.0, num_point=51)
+        result = sim.simulate()
+        self.assertEqual(list(result.timecourse_df.columns), model.species_names)
+
+    def test_reaction_columns_appended_after_species(self) -> None:
+        """Reaction IDs are appended after the species columns."""
+        if IGNORE_TESTS:
+            return
+        model = _make_model()
+        reaction_ids = _get_reaction_ids(ANTIMONY_MODEL)
+        sim = Simulator(model=model, start_time=0.0, end_time=10.0, num_point=51,
+                        is_reaction_in_output=True)
+        result = sim.simulate()
+        self.assertEqual(
+            list(result.timecourse_df.columns),
+            model.species_names + reaction_ids,
+        )
+
+    def test_reaction_output_shape(self) -> None:
+        """The timecourse gains one column per reaction."""
+        if IGNORE_TESTS:
+            return
+        model = _make_model()
+        num_point = 51
+        sim = Simulator(model=model, start_time=0.0, end_time=10.0, num_point=num_point,
+                        is_reaction_in_output=True)
+        result = sim.simulate()
+        expected_cols = model.num_species + len(_get_reaction_ids(ANTIMONY_MODEL))
+        self.assertEqual(result.timecourse_df.shape, (num_point, expected_cols))
+
+    def test_reaction_rates_match_rate_law(self) -> None:
+        """Reaction columns hold the actual rates, not concentrations.
+
+        For S1 -> S2 with rate k1*S1 and S1(0)=10, k1=0.1: r1(t) = exp(-0.1 t),
+        so r1(0) = 1.0 and r1(10) = exp(-1). The second reaction consumes S2,
+        which starts at 0, so its rate is 0 at t=0.
+        """
+        if IGNORE_TESTS:
+            return
+        model = _make_model()
+        reaction_ids = _get_reaction_ids(ANTIMONY_MODEL)
+        r1_id, r2_id = reaction_ids[0], reaction_ids[1]
+        sim = Simulator(model=model, start_time=0.0, end_time=10.0, num_point=51,
+                        is_reaction_in_output=True)
+        result = sim.simulate()
+        r1_values = result.timecourse_df[r1_id].values
+        r2_values = result.timecourse_df[r2_id].values
+        self.assertAlmostEqual(r1_values[0], 1.0, places=5)
+        np.testing.assert_allclose(r1_values[-1], np.exp(-1.0), rtol=1e-4)
+        self.assertAlmostEqual(r2_values[0], 0.0, places=5)
+
+    def test_reaction_rates_track_species_concentrations(self) -> None:
+        """Each rate column equals its rate law evaluated on the species columns."""
+        if IGNORE_TESTS:
+            return
+        model = _make_model()
+        reaction_ids = _get_reaction_ids(ANTIMONY_MODEL)
+        r1_id, r2_id = reaction_ids[0], reaction_ids[1]
+        sim = Simulator(model=model, start_time=0.0, end_time=10.0, num_point=51,
+                        is_reaction_in_output=True)
+        result = sim.simulate()
+        s1_values = result.timecourse_df["S1"].values
+        s2_values = result.timecourse_df["S2"].values
+        np.testing.assert_allclose(
+            result.timecourse_df[r1_id].values, 0.1 * s1_values, rtol=1e-4)
+        np.testing.assert_allclose(
+            result.timecourse_df[r2_id].values, 0.2 * s2_values, rtol=1e-4)
+
+    def test_reaction_rates_nonnegative_and_finite(self) -> None:
+        """Reaction rates are finite and never negative."""
+        if IGNORE_TESTS:
+            return
+        model = _make_model()
+        reaction_ids = _get_reaction_ids(ANTIMONY_MODEL)
+        sim = Simulator(model=model, start_time=0.0, end_time=10.0, num_point=51,
+                        is_reaction_in_output=True)
+        result = sim.simulate()
+        for reaction_id in reaction_ids:
+            values = result.timecourse_df[reaction_id].values
+            self.assertTrue(np.all(np.isfinite(values)))
+            self.assertGreaterEqual(float(values.min()), 0.0)
+
+    def test_reaction_output_with_jacobian_collection(self) -> None:
+        """Reaction columns and Jacobian collection can be combined."""
+        if IGNORE_TESTS:
+            return
+        model = _make_model()
+        num_point = 51
+        sim = Simulator(model=model, start_time=0.0, end_time=10.0, num_point=num_point,
+                        is_reaction_in_output=True)
+        result = sim.simulate(is_jacobian_collection=True)
+        expected_cols = model.num_species + len(_get_reaction_ids(ANTIMONY_MODEL))
+        self.assertEqual(result.timecourse_df.shape, (num_point, expected_cols))
+        expected_jac_shape = (num_point, model.num_species, model.num_species)
+        self.assertEqual(result.jacobian_collection_arr.shape, expected_jac_shape)
 
 
 class TestSimulatorGetSteadyState(unittest.TestCase):
