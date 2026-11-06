@@ -1,5 +1,6 @@
 # TO DO
 
+1. Verify rate_law_analyzer
 
 # Analyses
 1. Consistency of changepoint and AUC across replications
