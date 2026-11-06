@@ -1,4 +1,4 @@
-'''Analyzes the accuracy of linear approximations to reaction rate laws.'''
+'''Analyzes the accuracy of linear approximations to reaction rate laws. '''
 
 import src.constants as cn
 from model import Model  # type: ignore
