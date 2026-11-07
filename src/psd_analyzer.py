@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt  # type: ignore
 import matplotlib  # type: ignore
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
-from typing import Union, List, Any, cast, Optional, Tuple, Any
+from typing import Union, List, Any, Optional, Tuple
 
-OUTPUT_PATH_PAT = os.path.join(cn.DATA_DIR, "psd_prediction_analyzer__minaccuracy_%s__accuracystat_%s__.csv")
+OUTPUT_PATH_PAT = os.path.join(cn.DATA_DIR, "psd_prediction_analyzer_bestmodel__minaccuracy_%s__accuracystat_%s.csv")
 
 
 class PSDAnalyzer:
@@ -156,14 +156,20 @@ class PSDAnalyzer:
     def makeBestPSDModelDF(cls, min_accuracy: float = cn.DEF_MIN_ACCURACY,
             accuracy_stat: str = cn.DEF_ACCURACY_STAT,
             output_path_pat: str = OUTPUT_PATH_PAT,
+            is_force_update: bool = False,
             ) -> pd.DataFrame:
         """Create the best PSD models for all models meeting the minimum accuracy threshold.
 
+        Models with no prediction meeting the accuracy threshold are skipped and
+        reported via a warning; they do not appear in the result.
+
         Args:
-            min_accuaracy (float): The minimum accuracy threshold for predictions to be considered valid.
+            min_accuracy (float): The minimum accuracy threshold for predictions to be considered valid.
             output_path_pat (str): The path pattern for saving the output CSV file containing the best PSD models.
                 or a plain file path if no formatting is needed.
             accuracy_stat (str): The accuracy statistic to use for determining the best models.
+                Must be a column of the prediction files (e.g. cn.COL_MEAN, cn.COL_P50).
+            is_force_update (bool): Overwrite any existing file
 
         Returns:
             pd.DataFrame: A DataFrame containing the best PSD models and their associated metadata.
@@ -173,23 +179,34 @@ class PSDAnalyzer:
         except TypeError:
             output_path = output_path_pat
         #
-        if os.path.exists(output_path):
+        if os.path.exists(output_path) and (not is_force_update):
             print(f"Output file already exists at {output_path}. Loading it instead of generating a new one.")
             df = pd.read_csv(output_path)
             return df.reset_index()
         #
         t_iter = TimecourseIterator()
         sers: List[pd.Series] = []
-        best_model_df = pd.DataFrame()
+        skipped_models: List[str] = []
         for item in t_iter:
             analyzer = PSDAnalyzer(item.model_name, min_accuracy=min_accuracy,
                     accuracy_stat=accuracy_stat)
-            sers.append(cast(pd.Series, analyzer.best_model_ser))
+            if analyzer.best_model_ser is None:
+                skipped_models.append(item.model_name)
+                continue
+            sers.append(analyzer.best_model_ser)
+        if skipped_models:
+            print(f"WARNING: no valid PSD predictions for {len(skipped_models)} model(s) "
+                  f"with min_accuracy={min_accuracy}, accuracy_stat={accuracy_stat}: "
+                  f"{skipped_models}")
+        if sers:
             best_model_df = pd.concat(sers, axis=1).T
+        else:
+            best_model_df = pd.DataFrame()
+        # Save the results to the specified output path. Only write a non-empty file so
+        # an interrupted run never leaves a partial/empty CSV for the cache check to load.
+        if not best_model_df.empty:
             best_model_df.to_csv(output_path, index=False)
-        # Save the results to the specified output path
-        best_model_df = best_model_df.reset_index()
-        return best_model_df
+        return best_model_df.reset_index()
 
     @classmethod
     def plotBestLinearFits(cls,

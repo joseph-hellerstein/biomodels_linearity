@@ -302,7 +302,7 @@ class TestMain(unittest.TestCase):
         )
         MockIterCls.return_value = self._patched_iterator([fake_item])
 
-        result = main(is_report=False)
+        result = main(is_report=False, is_update_bestmodels=False)
         # Item skipped -> no failures.
         self.assertEqual(result, 0)
 
@@ -322,11 +322,50 @@ class TestMain(unittest.TestCase):
         MockIterCls.return_value = self._patched_iterator([item])
 
         with patch("builtins.print") as mock_print:
-            result = main(is_report=True)
+            result = main(is_report=True, is_update_bestmodels=False)
 
         output = "".join(call.args[0] for call in mock_print.call_args_list if call.args)
         self.assertIn("SUCCESS", output)
         self.assertIn("Successfully processed", output)
+
+    @patch(
+        "scripts.update_psd_prediction_files.PSDPredictionFileIterator",
+    )
+    @patch(
+        "scripts.update_psd_prediction_files.PSDAnalyzer.makeBestPSDModelDF",
+    )
+    def test_bestmodels_section_calls_each_combination(
+            self, mock_make: MagicMock, MockIterCls: MagicMock) -> None:
+        """The bestmodel phase calls makeBestPSDModelDF once per combination."""
+        MockIterCls.return_value = self._patched_iterator([])
+
+        result = main(is_report=False)
+
+        self.assertEqual(result, 0)
+        calls = {(c.kwargs["min_accuracy"], c.kwargs["accuracy_stat"])
+                 for c in mock_make.call_args_list}
+        self.assertEqual(calls, {(0.8, cn.COL_MEAN), (0.9, cn.COL_MEAN),
+                                 (0.8, cn.COL_P50), (0.9, cn.COL_P50)})
+        self.assertTrue(all(c.kwargs["is_force_update"] is True
+                            for c in mock_make.call_args_list))
+
+    @patch(
+        "scripts.update_psd_prediction_files.PSDPredictionFileIterator",
+    )
+    @patch(
+        "scripts.update_psd_prediction_files.PSDAnalyzer.makeBestPSDModelDF",
+        side_effect=KeyError("median"),
+    )
+    def test_bestmodels_failure_returns_nonzero(
+            self, mock_make: MagicMock, MockIterCls: MagicMock) -> None:
+        """A failing makeBestPSDModelDF combination makes main() return non-zero."""
+        MockIterCls.return_value = self._patched_iterator([])
+
+        result = main(is_report=False)
+
+        # Every combination was attempted, and each failure is counted.
+        self.assertEqual(mock_make.call_count, 4)
+        self.assertEqual(result, 1)
 
     def test_update_tasks_structure(self) -> None:
         """``UPDATE_TASKS`` contains exactly two tasks with expected column names."""

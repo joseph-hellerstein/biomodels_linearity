@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-'''Update columns to every ``data/piecewise_predictions*.csv`` file.
+'''Update columns to every ``data/piecewise_predictions*.csv`` file. Create bestmodel files.
 
 For each row, AUC is computed from that row's own changepoints via :class:`NLCurve`:
 
@@ -27,6 +27,7 @@ import src.util as util  # type: ignore
 from src.cumulative_segment_curve import CumulativeSegmentCurve # type: ignore
 from src.piecewise_system_discovery import PiecewiseSystemDiscovery  # type: ignore
 from src.psd_prediction_file_iterator import PSDPredictionFileIterator, PSDPredictionItem  # type: ignore
+from src.psd_analyzer import PSDAnalyzer  # type: ignore
 
 import argparse
 import sys
@@ -117,7 +118,16 @@ UPDATE_TASKS = [
 # Main script
 ############################
 
-def main(is_report: bool = False):
+def main(is_report: bool = False, is_update_bestmodels: bool = True) -> int:
+    """Update the piecewise prediction files and optionally build the bestmodel CSVs.
+
+    Args:
+        is_report (bool, optional): Output progress. Defaults to False.
+        is_update_bestmodels (bool, optional): Construct the bestmodel files. Defaults to True.
+
+    Returns:
+        int: 0 if all updates and bestmodel generations succeeded, 1 otherwise.
+    """
 
     ##
     def message(msg: str) -> None:
@@ -153,7 +163,25 @@ def main(is_report: bool = False):
             message(f"    backed up -> {backup_path.name}")
 
     if is_report:
-        print(f"Successfully processed {success_count}. {fail_count} FAIL.")   
+        print(f"Successfully processed {success_count}. {fail_count} FAIL.") 
+
+    # Creating best model CSVs for each minaccuracy/accuracystat combination
+    if is_update_bestmodels:
+        print("Creating psd_analyzer_bestmodel CSVs for each minaccuracy/accuracystat combination.")
+        min_accuracy_list = [0.8, 0.9]
+        accuracy_stat_list = [cn.COL_MEAN, cn.COL_P50]  # must be columns of the prediction files
+        for min_accuracy in min_accuracy_list:
+            for accuracy_stat in accuracy_stat_list:
+                if is_report:
+                    print(f"Processing min_accuracy={min_accuracy}, accuracy_stat={accuracy_stat}...")
+                try:
+                    _ = PSDAnalyzer.makeBestPSDModelDF(min_accuracy=min_accuracy, accuracy_stat=accuracy_stat,
+                            is_force_update=True)
+                except Exception as exc:
+                    message(f"  FAIL: PSDAnalyzer.makeBestPSDModelDF failed for min_accuracy={min_accuracy}, accuracy_stat={accuracy_stat}: {exc}")
+                    fail_count += 1
+                    continue
+
     return 0 if fail_count == 0 else 1
 
 
@@ -163,5 +191,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Show per-file and progress output.")
+    parser.add_argument("--skip-bestmodels", action="store_true",
+                        help="Skip creating the psd_analyzer_bestmodel CSVs.")
     args = parser.parse_args()
-    sys.exit(main(is_report=args.verbose))
+    sys.exit(main(is_report=args.verbose, is_update_bestmodels=not args.skip_bestmodels))
