@@ -18,6 +18,7 @@ from model import Model  # type: ignore
 from simulator import Simulator, SimulationResult  # type: ignore
 
 IGNORE_TESTS = False
+_HAS_BIOMODELS = os.path.exists(cn.BIOMODELS_DIR) and os.path.isdir(cn.BIOMODELS_DIR)
 
 
 # A model with one Michaelis-Menten and one mass-action reaction.
@@ -312,6 +313,7 @@ class TestMakeEstimatesDF(unittest.TestCase):
         pd.testing.assert_series_equal(df[r1_id], analyzer._makeRateLawEstimates(r1_id))
 
 
+@unittest.skipIf(not _HAS_BIOMODELS, "BioModels directory not found")
 class TestLocalParameters(unittest.TestCase):
     """Tests for kinetic law local parameter and compartment handling."""
 
