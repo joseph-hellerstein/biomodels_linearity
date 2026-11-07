@@ -88,6 +88,7 @@ def _make_analyzer(model: Model, boundaries: List[int]) -> rla.RateLawAnalyzer:
     return analyzer
 
 
+@unittest.skipIf(not _HAS_BIOMODELS, "BioModels directory not found")
 class TestRateLawAnalyzerInit(unittest.TestCase):
     """Tests for RateLawAnalyzer.__init__."""
 
