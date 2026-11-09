@@ -1,6 +1,7 @@
 # TO DO
 
 1. Verify rate_law_analyzer
+1. Review data_provenance.md and change data as needed.
 
 # Analyses
 1. Consistency of changepoint and AUC across replications

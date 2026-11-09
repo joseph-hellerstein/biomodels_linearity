@@ -7,6 +7,7 @@ import types
 import unittest
 from typing import Optional, cast, Any, Union
 from unittest.mock import patch
+import zipfile
 import matplotlib.pyplot as plt  # noqa: F401 -- non-interactive backend needed before pyplot
 #matplotlib.use("Agg")
 
@@ -328,6 +329,10 @@ class TestMakeBestPSDModelDF(unittest.TestCase):
             output_path = os.path.join(self._tmpdir.name,
                                        f"best_psd_models_{self._run_count}.csv")
 
+        # Isolate from the real data archive: default to a per-test temp zip so no test
+        # reads or writes cn.BESTMODEL_ZIP_PATH. Explicit zip_path args still win.
+        kwargs.setdefault("zip_path", os.path.join(self._tmpdir.name, "test_bestmodels.zip"))
+
         def fake_query(dataframe_filter=None, **_kwargs):
             df = base_df.copy()
             if dataframe_filter is not None:
@@ -437,6 +442,108 @@ class TestMakeBestPSDModelDF(unittest.TestCase):
         """With no models to iterate, the result should be an empty DataFrame."""
         result = self._run(pd.DataFrame([self._qualifying_row("BIOMD0000000005", 0.2)]), [])
         self.assertTrue(result.empty)
+
+    # ------------------------------------------------------------------
+    # zip_path loading
+    # ------------------------------------------------------------------
+
+    def _make_zip(self, csv_name: str, df: pd.DataFrame) -> str:
+        """Write df as a CSV and zip it under csv_name; return the zip path."""
+        csv_path = os.path.join(self._tmpdir.name, csv_name)
+        df.to_csv(csv_path, index=False)
+        zip_path = os.path.join(self._tmpdir.name, "bestmodels.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.write(csv_path, csv_name)
+        os.remove(csv_path)
+        return zip_path
+
+    def test_loads_csv_from_zip_when_present(self) -> None:
+        """A desired CSV present in zip_path is loaded from the zip."""
+        output_path = os.path.join(self._tmpdir.name, "best_psd_models_z1.csv")
+        zip_path = self._make_zip(os.path.basename(output_path),
+                                  pd.DataFrame([{"system_id": "BIOMD000000099",
+                                                 cn.COL_AUC: 0.42}]))
+
+        base_df = pd.DataFrame([self._qualifying_row("BIOMD000000005", 0.2)])
+        result = self._run(base_df, ["BIOMD000000005"],
+                           output_path=output_path, zip_path=zip_path)
+
+        self.assertEqual(result[cn.COL_SYSTEM_ID].tolist(), ["BIOMD000000099"])
+        self.assertAlmostEqual(float(result[cn.COL_AUC].iloc[0]), 0.42)
+
+    def test_falls_back_to_generation_when_csv_not_in_zip(self) -> None:
+        """A zip without the desired CSV falls back to normal generation."""
+        output_path = os.path.join(self._tmpdir.name, "best_psd_models_z2.csv")
+        zip_path = self._make_zip("unrelated.csv",
+                                  pd.DataFrame([{"system_id": "BIOMD000000099"}]))
+
+        base_df = pd.DataFrame([self._qualifying_row("BIOMD000000005", 0.2)])
+        result = self._run(base_df, ["BIOMD000000005"],
+                           output_path=output_path, zip_path=zip_path)
+
+        self.assertEqual(result[cn.COL_SYSTEM_ID].tolist(), ["BIOMD000000005"])
+        self.assertAlmostEqual(float(result[cn.COL_AUC].iloc[0]), 0.2)
+
+    def test_force_update_ignores_zip(self) -> None:
+        """is_force_update=True regenerates even when the zip has the CSV."""
+        output_path = os.path.join(self._tmpdir.name, "best_psd_models_z3.csv")
+        zip_path = self._make_zip(os.path.basename(output_path),
+                                  pd.DataFrame([{"system_id": "BIOMD000000099",
+                                                 cn.COL_AUC: 0.42}]))
+
+        base_df = pd.DataFrame([self._qualifying_row("BIOMD000000005", 0.2)])
+        result = self._run(base_df, ["BIOMD000000005"],
+                           output_path=output_path, zip_path=zip_path,
+                           is_force_update=True)
+
+        self.assertEqual(result[cn.COL_SYSTEM_ID].tolist(), ["BIOMD000000005"])
+
+    def test_missing_zip_falls_back_to_generation(self) -> None:
+        """A nonexistent zip_path is ignored and generation proceeds."""
+        base_df = pd.DataFrame([self._qualifying_row("BIOMD000000005", 0.2)])
+        result = self._run(base_df, ["BIOMD000000005"],
+                           output_path=os.path.join(self._tmpdir.name, "best_psd_models_z4.csv"),
+                           zip_path=os.path.join(self._tmpdir.name, "no_such.zip"))
+
+        self.assertEqual(result[cn.COL_SYSTEM_ID].tolist(), ["BIOMD000000005"])
+
+    def test_empty_result_does_not_touch_zip(self) -> None:
+        """An empty result must not create or modify the zip archive."""
+        output_path = os.path.join(self._tmpdir.name, "best_psd_models_empty.csv")
+        zip_path = os.path.join(self._tmpdir.name, "empty_case.zip")
+        base_df = pd.DataFrame([self._qualifying_row("BIOMD000000005", 0.2)])
+        result = self._run(base_df, [], output_path=output_path, zip_path=zip_path)
+
+        self.assertTrue(result.empty)
+        # No CSV written and no archive created for an empty result.
+        self.assertFalse(os.path.exists(output_path))
+        self.assertFalse(os.path.exists(zip_path))
+
+    def test_force_update_replaces_existing_zip_entry(self) -> None:
+        """is_force_update=True replaces an existing zip entry rather than duplicating it."""
+        output_path = os.path.join(self._tmpdir.name, "best_psd_models_dup.csv")
+        csv_name = os.path.basename(output_path)
+        zip_path = self._make_zip(csv_name, pd.DataFrame([{"system_id": "BIOMD000000099",
+                                                           cn.COL_AUC: 0.42}]))
+        base_df = pd.DataFrame([self._qualifying_row("BIOMD000000005", 0.2)])
+        result = self._run(base_df, ["BIOMD000000005"],
+                           output_path=output_path, zip_path=zip_path,
+                           is_force_update=True)
+
+        self.assertEqual(result[cn.COL_SYSTEM_ID].tolist(), ["BIOMD000000005"])
+        with zipfile.ZipFile(zip_path) as zf:
+            matches = [n for n in zf.namelist() if os.path.basename(n) == csv_name]
+        self.assertEqual(len(matches), 1)
+
+    def test_zip_path_none_disables_zip(self) -> None:
+        """zip_path=None skips all zip handling but still writes the local CSV."""
+        output_path = os.path.join(self._tmpdir.name, "best_psd_models_none.csv")
+        base_df = pd.DataFrame([self._qualifying_row("BIOMD000000005", 0.2)])
+        result = self._run(base_df, ["BIOMD000000005"],
+                           output_path=output_path, zip_path=None)
+
+        self.assertEqual(result[cn.COL_SYSTEM_ID].tolist(), ["BIOMD000000005"])
+        self.assertTrue(os.path.exists(output_path))
 
 
 # ---------------------------------------------------------------------------

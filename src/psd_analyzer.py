@@ -7,6 +7,7 @@ from src.piecewise_system_discovery import PiecewiseSystemDiscovery, ExtendedPlo
 from src.timecourse_iterator import TimecourseIterator  # type: ignore
 
 import os
+import zipfile
 import matplotlib.pyplot as plt  # type: ignore
 import matplotlib  # type: ignore
 import numpy as np  # type: ignore
@@ -14,6 +15,7 @@ import pandas as pd  # type: ignore
 from typing import Union, List, Any, Optional, Tuple
 
 OUTPUT_PATH_PAT = os.path.join(cn.DATA_DIR, "psd_prediction_analyzer_bestmodel__minaccuracy_%s__accuracystat_%s.csv")
+BESTMODEL_ZIP_PATH = os.path.join(cn.DATA_DIR, "psd_analyzer_bestmodel.zip")
 
 
 class PSDAnalyzer:
@@ -152,16 +154,65 @@ class PSDAnalyzer:
 
         return pd.DataFrame(grouped_df)
 
+    @staticmethod
+    def _loadCSVFromZip(zip_path: str, csv_name: str) -> pd.DataFrame | None:
+        """Load the CSV named *csv_name* from the zip archive at *zip_path*.
+
+        Args:
+            zip_path (str): Path to the zip archive.
+            csv_name (str): Name of the CSV file to look for inside the archive.
+                Matched by basename, so directory prefixes in entry names are OK.
+
+        Returns:
+            pd.DataFrame | None: The loaded DataFrame, or None if the archive does
+                not contain a file with that name.
+        """
+        with zipfile.ZipFile(zip_path) as zf:
+            entry = next((name for name in zf.namelist()
+                          if os.path.basename(name) == csv_name), None)
+            if entry is None:
+                return None
+            return pd.read_csv(zf.open(entry))
+
+    @staticmethod
+    def _upsertCSVInZip(zip_path: str, csv_path: str) -> None:
+        """Add *csv_path* to the zip archive at *zip_path*, replacing any existing
+        entry that shares its basename. The archive is created if it does not exist.
+
+        Args:
+            zip_path (str): Path to the zip archive.
+            csv_path (str): Local CSV file to store in the archive (stored by basename).
+        """
+        csv_name = os.path.basename(csv_path)
+        kept: List[Tuple[str, bytes]] = []
+        if os.path.isfile(zip_path):
+            with zipfile.ZipFile(zip_path) as zf:
+                for name in zf.namelist():
+                    if os.path.basename(name) == csv_name:
+                        continue  # drop the stale copy; a fresh one is written below
+                    kept.append((name, zf.read(name)))
+        with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for name, data in kept:
+                zf.writestr(name, data)
+            with open(csv_path, "rb") as fh:
+                zf.writestr(csv_name, fh.read())
+
     @classmethod
     def makeBestPSDModelDF(cls, min_accuracy: float = cn.DEF_MIN_ACCURACY,
             accuracy_stat: str = cn.DEF_ACCURACY_STAT,
             output_path_pat: str = OUTPUT_PATH_PAT,
             is_force_update: bool = False,
+            zip_path: Optional[str] = BESTMODEL_ZIP_PATH,
             ) -> pd.DataFrame:
         """Create the best PSD models for all models meeting the minimum accuracy threshold.
 
         Models with no prediction meeting the accuracy threshold are skipped and
         reported via a warning; they do not appear in the result.
+
+        The desired CSV is looked up by filename inside *zip_path* and loaded if
+        present; otherwise it is generated, written to the local output path, and
+        stored in *zip_path* (added if the archive exists without it, created if the
+        archive is missing). With *is_force_update* an existing entry is replaced.
 
         Args:
             min_accuracy (float): The minimum accuracy threshold for predictions to be considered valid.
@@ -169,25 +220,31 @@ class PSDAnalyzer:
                 or a plain file path if no formatting is needed.
             accuracy_stat (str): The accuracy statistic to use for determining the best models.
                 Must be a column of the prediction files (e.g. cn.COL_MEAN, cn.COL_P50).
-            is_force_update (bool): Overwrite any existing file
+            is_force_update (bool): Regenerate even if the CSV is already in *zip_path*,
+                replacing any existing entry.
+            zip_path (str | None): Zip archive to look in for the desired CSV file
+                (matched by filename) and, when generating, to store it in. Defaults to
+                BESTMODEL_ZIP_PATH; pass None to disable all zip handling (the CSV is
+                still written to the local output path).
 
         Returns:
             pd.DataFrame: A DataFrame containing the best PSD models and their associated metadata.
         """
         try:
-            output_path = output_path_pat % (str(min_accuracy), accuracy_stat)
+            best_model_path = output_path_pat % (str(min_accuracy), accuracy_stat)
         except TypeError:
-            output_path = output_path_pat
+            best_model_path = output_path_pat
+        csv_name = os.path.basename(best_model_path)
+        # (a) Read from the zip when it exists and contains best_model.
+        if (not is_force_update) and zip_path is not None and os.path.isfile(zip_path):
+            df = cls._loadCSVFromZip(zip_path, csv_name)
+            if df is not None:
+                print(f"Loaded {csv_name} from zip at {zip_path}.")
+                return df.reset_index()
         #
-        if os.path.exists(output_path) and (not is_force_update):
-            print(f"Output file already exists at {output_path}. Loading it instead of generating a new one.")
-            df = pd.read_csv(output_path)
-            return df.reset_index()
-        #
-        t_iter = TimecourseIterator()
         sers: List[pd.Series] = []
         skipped_models: List[str] = []
-        for item in t_iter:
+        for item in TimecourseIterator():
             analyzer = PSDAnalyzer(item.model_name, min_accuracy=min_accuracy,
                     accuracy_stat=accuracy_stat)
             if analyzer.best_model_ser is None:
@@ -196,16 +253,24 @@ class PSDAnalyzer:
             sers.append(analyzer.best_model_ser)
         if skipped_models:
             print(f"WARNING: no valid PSD predictions for {len(skipped_models)} model(s) "
-                  f"with min_accuracy={min_accuracy}, accuracy_stat={accuracy_stat}: "
-                  f"{skipped_models}")
+                    f"with min_accuracy={min_accuracy}, accuracy_stat={accuracy_stat}: "
+                    f"{skipped_models}")
         if sers:
             best_model_df = pd.concat(sers, axis=1).T
         else:
             best_model_df = pd.DataFrame()
-        # Save the results to the specified output path. Only write a non-empty file so
-        # an interrupted run never leaves a partial/empty CSV for the cache check to load.
+        # Persist only when there is data, so an interrupted/empty run never leaves a
+        # partial CSV or touches the archive. (b) add to an existing zip / (c) create it
+        # when missing; force_update replaces any existing entry to avoid duplicates.
         if not best_model_df.empty:
-            best_model_df.to_csv(output_path, index=False)
+            best_model_df.to_csv(best_model_path, index=False)
+            if zip_path is not None:
+                if is_force_update and os.path.isfile(zip_path):
+                    cls._upsertCSVInZip(zip_path, best_model_path)
+                else:
+                    with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED) as zf:
+                        zf.write(best_model_path, arcname=csv_name)
+        #
         return best_model_df.reset_index()
 
     @classmethod

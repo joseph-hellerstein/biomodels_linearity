@@ -12,8 +12,8 @@ from src.system_discovery import discoverNetwork
 from src.timecourse import Timecourse
 from src.cumulative_segment_curve import CumulativeSegmentCurve
 
-IS_PLOT = True
-IS_ALL = False
+IS_PLOT = False
+IS_ALL = True
 
 if not IS_PLOT:
     import matplotlib # type: ignore
@@ -200,7 +200,7 @@ if IS_ALL:
 ########################
 # Distribution of longest segment for models with different min_accuarcy
 ########################
-if True:
+if IS_ALL:
     _, ax = PSDAnalyzer.makeLongestSegmentCDFPlot(min_accuracy=0.8, accuracy_stat="p50")
     _, _ = PSDAnalyzer.makeLongestSegmentCDFPlot(min_accuracy=0.9, accuracy_stat="p50", ax=ax)
     ax.legend(["min_accuracy=0.8", "min_accuracy=0.9"])
