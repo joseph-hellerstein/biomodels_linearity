@@ -1,13 +1,15 @@
 '''Analyzes the accuracy of linear approximations to reaction rate laws. '''
 
 import src.constants as cn
-from model import Model  # type: ignore
-from psd_analyzer import PSDAnalyzer  # type: ignore
-from simulator import Simulator  # type: ignore
-from statistic_calculator import StatisticCalculator  # type: ignore
+from src.model import Model  # type: ignore
+from src.psd_analyzer import PSDAnalyzer  # type: ignore
+from src.simulator import Simulator  # type: ignore
+from src.statistic_calculator import StatisticCalculator  # type: ignore
+from src.timecourse_iterator import TimecourseIterator  # type: ignore
 
 import re
 import sys
+import matplotlib.pyplot as plt  # type: ignore
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 import sympy as sp  # type: ignore
@@ -55,9 +57,10 @@ class RateLawAnalyzer(object):
 
     For each reaction, the SBML rate law is extracted as a sympy expression
     (via SBMLKinetics) and linearized, via its first-order Taylor expansion,
-    around the species concentrations at the start of each segment defined by
-    the best PSD prediction's boundaries. The piecewise linear estimates are
-    compared against the rates observed in a simulation with reaction output.
+    around the species concentrations at the previous timepoint:
+    est(t) = f(x_{t-1}) + J(x_{t-1}) * (x_t - x_{t-1}). The estimates are
+    compared against the rates observed in a simulation with reaction output
+    (est(t) vs. the true rate at t).
     '''
 
     def __init__(self, biomodel_id: Union[str, int],
@@ -81,6 +84,8 @@ class RateLawAnalyzer(object):
         self._drate_law_dct = self._makeDRateLawDct()
         self._parameter_value_dct = self._makeParameterValueDct()
         self._local_parameter_dct = self._makeLocalParameterDct()
+        # Cache of compiled (numpy) rate-law callables, keyed by reaction id.
+        self._compiled_cache: Dict[str, object] = {}
         self._timecourse_df = self._simulate()
         analyzer = PSDAnalyzer(model_id=self.model_num,
                 min_accuracy=self.min_accuracy, accuracy_stat=self.accuracy_stat)
@@ -92,7 +97,11 @@ class RateLawAnalyzer(object):
         self._boundaries: List[int] = [int(b) for b in self._best_model_ser[cn.COL_BOUNDARIES]]
 
     def makeAccuracyDF(self) -> pd.DataFrame:
-        '''Compares the piecewise linear rate estimates against the simulated rates.
+        '''Compares the one-step rate estimates against the simulated rates.
+
+        est(t) is a linearization anchored at time t - 1 evaluated at t, so it
+        aligns directly with the true rate at t. The first timepoint has no
+        previous step and becomes a sentinel.
 
         Accuracy follows the project convention (see Score):
             Accuracy = 1 - clip(|estimate - true| / |true|, 0, 1),
@@ -116,11 +125,12 @@ class RateLawAnalyzer(object):
         return calculator.dataframe.set_index(cn.COL_LABEL)
 
     def makeEstimatesDF(self) -> pd.DataFrame:
-        '''Creates a DataFrame of the piecewise linear rate estimates for all reactions.
+        '''Creates a DataFrame of the one-step rate estimates for all reactions.
 
         Returns:
             DataFrame: Indexed by time with one column per reaction holding the
-                estimated rate.
+                estimated rate; est(t) estimates the rate at t from a linearization
+                anchored at t - 1, and the first row is NaN.
         '''
         return pd.concat(
             [self._makeRateLawEstimates(reaction_id) for reaction_id in self._rate_law_dct],
@@ -262,47 +272,71 @@ class RateLawAnalyzer(object):
                 per floating species and, because is_reaction_in_output=True,
                 one column per reaction holding the observed rate.
         '''
-        return Simulator.simulateBiomodel(self.model_num,
+        df = Simulator.simulateBiomodel(self.model_num,
                 is_reaction_in_output=True).timecourse_df
+        return df
 
-    def _makeSegmentStarts(self) -> List[int]:
-        '''Returns the row indices at which each linearization segment starts.
+    def _compiled_functions_for(self, reaction_id: str):
+        '''Compile the rate law and its derivatives to numpy functions for *reaction_id*.
 
-        Follows PiecewiseSystemDiscovery's convention: the boundaries list is
-        [0] + changepoints + [num_point - 1], and segments are half-open
-        intervals between consecutive changepoints, with the final segment
-        extending to the end of the timecourse.
-
-        Returns:
-            list[int]: Segment start row indices in increasing order, always including 0.
-        '''
-        num_points = len(self._timecourse_df)
-        bounds = [b for b in self._boundaries if 0 <= b < num_points]
-        # Drop the terminal marker (the final row index), if present.
-        if bounds and bounds[-1] == num_points - 1:
-            bounds = bounds[:-1]
-        starts = [0] + [b for b in bounds if b > 0]
-        return list(dict.fromkeys(starts))
-
-    def _makeRateLawEstimates(self, reaction_id: str) -> pd.Series:
-        '''Creates a series of estimated reaction rates based on the piecewise linear approximation.
-
-        Within each segment defined by _makeSegmentStarts, the rate law is
-        linearized around the species concentrations at the segment's starting
-        point: est(t) = f(x0) + sum_i (df/dx_i)(x0) * (x_i(t) - x0_i).
+        Parameters are substituted first (they are constant over time), so the
+        compiled callables take only the species that appear in the law. Returns
+        ``(f_func, deriv_funcs)`` or ``None`` if any free symbol remains after the
+        parameter substitution (in which case the caller falls back to symbolic
+        evaluation). Results are cached per reaction for the lifetime of the analyzer.
 
         Args:
             reaction_id (str): The identifier of the reaction.
 
         Returns:
-            pd.Series: Estimated rates indexed by time, named after the reaction.
+            Tuple[Callable, Dict[str, Callable]] | None: Compiled numpy callables, or None.
+        '''
+        if reaction_id in self._compiled_cache:
+            return self._compiled_cache[reaction_id]
+        expr = self._rate_law_dct[reaction_id]
+        deriv_dct = self._drate_law_dct[reaction_id]
+        species_names = list(deriv_dct)
+        sym_list = [sp.Symbol(n) for n in species_names]
+        param_subs = {sp.Symbol(name): value for name, value in self._parameter_value_dct.items()}
+        param_subs.update({sp.Symbol(name): value
+                for name, value in self._local_parameter_dct.get(reaction_id, {}).items()})
+        expr_sp = expr.subs(param_subs)
+        deriv_sp = {name: d.subs(param_subs) for name, d in deriv_dct.items()}
+        sym_set = set(sym_list)
+        if not (expr_sp.free_symbols <= sym_set and all(d.free_symbols <= sym_set for d in deriv_sp.values())):
+            self._compiled_cache[reaction_id] = None
+            return None
+        f_func = sp.lambdify(sym_list, expr_sp, modules='numpy')
+        deriv_funcs = {name: sp.lambdify(sym_list, d, modules='numpy') for name, d in deriv_sp.items()}
+        self._compiled_cache[reaction_id] = (f_func, deriv_funcs)
+        return f_func, deriv_funcs
+
+    def _makeRateLawEstimates(self, reaction_id: str) -> pd.Series:
+        '''Creates a series of estimated reaction rates based on one-step linearization.
+
+        At each timepoint t, the rate law is linearized around the species
+        concentrations at the previous timepoint and evaluated at t:
+            est(t) = f(x_{t-1}) + sum_i (df/dx_i)(x_{t-1}) * (x_i(t) - x_i(t-1)).
+        The first timepoint has no previous step and is set to NaN.
+
+        The expression and its derivatives are compiled to numpy callables once per
+        reaction (parameters substituted first, since they are constant over time),
+        so the whole timecourse is evaluated in a single vectorized pass. If any free
+        symbol remains after the parameter substitution, it falls back to symbolic
+        evaluation.
+
+        Args:
+            reaction_id (str): The identifier of the reaction.
+
+        Returns:
+            pd.Series: Estimated rates indexed by time, named after the reaction;
+                est(t) estimates the rate at t and the first entry is NaN.
 
         Raises:
             ValueError: If the reaction has no rate law in the model.
         '''
         if reaction_id not in self._rate_law_dct:
             raise ValueError(f"Reaction {reaction_id} has no rate law in model {self.model_name}.")
-        expr = self._rate_law_dct[reaction_id]
         deriv_dct = self._drate_law_dct[reaction_id]
         num_points = len(self._timecourse_df)
         # Species value series over the whole timecourse; species absent from
@@ -312,19 +346,221 @@ class RateLawAnalyzer(object):
             if species_name in self._timecourse_df.columns:
                 species_arr_dct[species_name] = self._timecourse_df[species_name].to_numpy(dtype=float)
             else:
-                species_arr_dct[species_name] = np.full(num_points, self.model.initial_value_dct[species_name])
+                init_val = self.model.initial_value_dct[species_name]
+                species_arr_dct[species_name] = np.full(num_points, init_val)
+
+        compiled = self._compiled_functions_for(reaction_id)
+        if compiled is not None:
+            f_func, deriv_funcs = compiled  # type: ignore
+            estimates = self._estimate_compiled(species_arr_dct, f_func, deriv_funcs)
+        else:
+            estimates = self._estimate_symbolic(reaction_id, species_arr_dct)
+        ser = pd.Series(estimates, index=self._timecourse_df.index, name=reaction_id)
+        return ser
+
+    def _estimate_compiled(self, species_arr_dct: Dict[str, np.ndarray],
+            f_func, deriv_funcs) -> np.ndarray:
+        '''One-step estimates using the compiled numpy callables.
+
+        Args:
+            species_arr_dct (dict): Species name -> full timecourse array. Its value
+                order matches the symbol order used to compile f_func / deriv_funcs.
+            f_func (Callable): Compiled rate law; takes species values in order.
+            deriv_funcs (dict): Species name -> compiled derivative callable.
+
+        Returns:
+            np.ndarray: Estimated rates over the whole timecourse; est(t) estimates
+                the rate at t (linearization anchored at t - 1) and the first entry
+                is NaN.
+        '''
+        return self._backward_one_step_estimates(species_arr_dct, f_func, deriv_funcs)
+
+    def _estimate_symbolic(self, reaction_id: str,
+            species_arr_dct: Dict[str, np.ndarray]) -> np.ndarray:
+        '''One-step estimates via symbolic (lambdified) callables.
+
+        Fallback path used when the rate law cannot be compiled to numpy callables
+        by _compiled_functions_for. The parameter-substituted expression and its
+        derivatives are lambdified over the species symbols; if any free symbol
+        remains that is not a species, evaluation is impossible and an error is raised.
+
+        Args:
+            reaction_id (str): The identifier of the reaction.
+            species_arr_dct (dict): Species name -> full timecourse array.
+
+        Returns:
+            np.ndarray: Estimated rates over the whole timecourse; est(t) estimates
+                the rate at t (linearization anchored at t - 1) and the first entry
+                is NaN.
+
+        Raises:
+            RuntimeError: If a free symbol remains after parameter substitution that
+                is not one of the species in the rate law.
+        '''
         param_subs = {sp.Symbol(name): value for name, value in self._parameter_value_dct.items()}
         param_subs.update(
             {sp.Symbol(name): value for name, value in self._local_parameter_dct.get(reaction_id, {}).items()})
-        starts = self._makeSegmentStarts()
-        estimates = np.empty(num_points)
-        for i, start in enumerate(starts):
-            end = starts[i + 1] if i + 1 < len(starts) else num_points
-            subs0 = {sp.Symbol(name): arr[start] for name, arr in species_arr_dct.items()}
-            subs0.update(param_subs)
-            f0 = float(expr.subs(subs0))
-            estimates[start:end] = f0 + sum(
-                float(deriv.subs(subs0)) * (species_arr_dct[name][start:end] - species_arr_dct[name][start])
-                for name, deriv in deriv_dct.items()
-            )
-        return pd.Series(estimates, index=self._timecourse_df.index, name=reaction_id)
+        expr_sp = self._rate_law_dct[reaction_id].subs(param_subs)
+        deriv_dct = self._drate_law_dct[reaction_id]
+        unresolved = {s.name for s in expr_sp.free_symbols} - set(species_arr_dct)
+        if unresolved:
+            raise RuntimeError(f"Cannot evaluate rate law for reaction {reaction_id}: "
+                    f"unresolved symbols {sorted(unresolved)} after parameter substitution.")
+        sym_list = [sp.Symbol(name) for name in deriv_dct]
+        f_func = sp.lambdify(sym_list, expr_sp, modules='numpy')
+        deriv_funcs = {name: sp.lambdify(sym_list, d.subs(param_subs), modules='numpy')
+                for name, d in deriv_dct.items()}
+        return self._backward_one_step_estimates(species_arr_dct, f_func, deriv_funcs)
+
+    def _backward_one_step_estimates(self, species_arr_dct: Dict[str, np.ndarray],
+            f_func, deriv_funcs) -> np.ndarray:
+        '''Vectorized one-step linearization estimates.
+
+        est(t) = f(x_{t-1}) + sum_i (df/dx_i)(x_{t-1}) * (x_i(t) - x_i(t-1))
+        for t = 1 .. n-1; the first timepoint has no previous step and is NaN.
+
+        Args:
+            species_arr_dct (dict): Species name -> full timecourse array. Its value
+                order must match the symbol order used to compile f_func / deriv_funcs.
+            f_func (Callable): Rate law callable; takes species arrays in order and
+                returns an array of values.
+            deriv_funcs (dict): Species name -> derivative callable with the same
+                calling convention as f_func.
+
+        Returns:
+            np.ndarray: Estimated rates over the whole timecourse; est(t) estimates
+                the rate at t (linearization anchored at t - 1) and the first entry
+                is NaN.
+        '''
+        num_points = len(self._timecourse_df)
+        estimates = np.full(num_points, np.nan)
+        if num_points < 2:
+            return estimates
+        x_prev = [species_arr_dct[name][:-1] for name in species_arr_dct]
+        est_arr = np.asarray(f_func(*x_prev), dtype=float)
+        for species_name, deriv_wrt_species in deriv_funcs.items():
+            dx_arr = species_arr_dct[species_name][1:] - species_arr_dct[species_name][:-1]
+            est_arr = est_arr + np.asarray(deriv_wrt_species(*x_prev), dtype=float) * dx_arr
+        estimates[1:] = est_arr
+        return estimates
+
+    def plotRateLawLinearization(self, reaction_id: str, ax=None, 
+            is_reaction_rate : bool = True, is_plot: bool = True) -> None:
+        '''Plots the piecewise linear rate estimates against the simulated rates.
+
+        Args:
+            reaction_id (str): The identifier of the reaction.
+            ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
+            is_reaction_rate (bool, optional): Whether to plot the reaction rate or relative error in estimate relative error in estimate
+        '''
+        import matplotlib.pyplot as plt  # type: ignore
+
+        if ax is None:
+            _, ax = plt.subplots(figsize=(10, 6))
+
+        true_rates = self._timecourse_df[reaction_id]
+        est_rates = self._makeRateLawEstimates(reaction_id)
+        err_rate = (est_rates - true_rates).abs() / true_rates.abs()
+
+        if is_reaction_rate:
+            ax.plot(true_rates.index, cast(np.ndarray, true_rates.values), label='Simulated Rate', color='blue')
+            ax.plot(est_rates.index, cast(np.ndarray, est_rates.values), label='Estimated Rate', color='orange', linestyle='--')
+        else:
+            ax.plot(err_rate.index, cast(np.ndarray, err_rate.values), label='Relative Error', color='red', linestyle='--')
+
+        for boundary in self._boundaries:
+            if 0 < boundary < len(true_rates):
+                ax.axvline(x=true_rates.index[boundary], color='gray', linestyle=':', alpha=0.5)
+
+        ax.set_title(f'Rate Law Linearization for Reaction {reaction_id}')
+        ax.set_xlabel('Time')
+        if is_reaction_rate:
+            ax.set_ylabel('Rate')
+        else:
+            ax.set_ylabel('Relative Error')
+            ax.set_ylim(0, 1)
+        ax.legend()
+        if is_plot:
+            plt.show()
+
+    def deprecatedplotAllRateLawLinearizations(self, num_col: int = 2, is_reaction_rate: bool = True) -> None:
+        '''
+        Plots the piecewise linear rate estimates against the simulated rates for all reactions.
+
+        Args:
+            ncol (int, optional): Number of columns in the subplot grid. Defaults to 2 
+            is_reaction_rate (bool, optional):
+                Whether to plot the reaction rate or relative error in estimate relative error in estimate
+        '''
+        import matplotlib.pyplot as plt  # type: ignore
+
+        num_reactions = len(self._rate_law_dct)
+        num_row = (num_reactions + num_col - 1) // num_col
+
+        fig, axes = plt.subplots(num_row, num_col, figsize=(12, num_row * 4))
+        axes = axes.flatten()
+
+        i = 0
+        for i, reaction_id in enumerate(self._rate_law_dct):
+            ax = axes[i]
+            self.plotRateLawLinearization(reaction_id, ax=ax, is_plot=False, is_reaction_rate=is_reaction_rate)
+            if i//num_col < num_row - 1:
+                ax.set_xlabel('')
+                ax.set_xticklabels([])
+
+        for j in range(i + 1, len(axes)):
+            fig.delaxes(axes[j])
+
+        plt.legend(list(self._rate_law_dct.keys()))
+
+        plt.tight_layout()
+        plt.show()
+
+    def plotAllRateLawLinearizations(self, ymax: float | None = None) -> None:
+        '''
+        Plots the piecewise linear rate estimates against the simulated rates for all reactions.
+
+        Args:
+            ncol (int, optional): Number of columns in the subplot grid. Defaults to 2 
+            is_reaction_rate (bool, optional):
+                Whether to plot the reaction rate or relative error in estimate relative error in estimate
+        ''' 
+
+        # Construct the true and estimated rate DataFrames, aligning them by dropping species columns from the true rates.
+        true_rate_df = self._timecourse_df.copy()
+        est_rate_df = self.makeEstimatesDF()
+        species_cols = [col for col in true_rate_df.columns if col not in est_rate_df.columns]
+        for col in species_cols:
+            true_rate_df.drop(columns=col, inplace=True)
+        #
+        rel_error_df = (est_rate_df - true_rate_df).abs()
+        dt_ser = true_rate_df.index.to_series().diff()
+        dt_ser = dt_ser.fillna(0)
+        dt = dt_ser.median()
+        for col in rel_error_df.columns:
+            rel_error_df[col] = rel_error_df[col] / true_rate_df[col].abs()
+            rel_error_df[col] = rel_error_df[col] / dt
+        rel_error_df = rel_error_df.fillna(0)  # Replace NaN with 0 for plotting
+
+        # Plot the relative errors as a stacked area. fill_between draws one
+        # polygon per reaction instead of one bar patch per time point, which
+        # is orders of magnitude faster for long timecourses.
+        _, ax = plt.subplots(figsize=(10, 6))
+        bottom = np.zeros(len(rel_error_df))
+        for col in rel_error_df.columns:
+            top = bottom + rel_error_df[col].to_numpy()
+            ax.fill_between(rel_error_df.index, bottom, top, label=col)
+            bottom = top
+        ax.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+        ax.set_xlabel('time')
+        ax.set_ylabel('time normalized, relative error')
+        #ax.set_ylim(0, rel_error_df.max().max())
+        if ymax is not None:
+            ax.set_ylim(0, ymax)
+        else:
+            ax.set_ylim(0, 1)
+
+        # Plot the segments
+        for boundary in self._boundaries:
+            if 0 < boundary < len(true_rate_df):
+                ax.axvline(x=true_rate_df.index[boundary], color='gray', linestyle=':', alpha=0.5)

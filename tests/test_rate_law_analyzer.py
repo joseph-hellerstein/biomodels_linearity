@@ -1,14 +1,20 @@
 """Tests for src/rate_law_analyzer.py."""
 
 import os
+import shutil
 import sys
+import tempfile
 import unittest
-from typing import List
+from typing import List, cast
 from unittest.mock import MagicMock, patch
 
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 import sympy as sp  # type: ignore
+
+import matplotlib  # type: ignore
+matplotlib.use("Agg")  # non-interactive backend for testing
+import matplotlib.pyplot as plt  # type: ignore
 
 import src.constants as cn  # type: ignore
 
@@ -172,51 +178,30 @@ class TestParameterValueDct(unittest.TestCase):
             return
 
 
-class TestSegmentStarts(unittest.TestCase):
-    """Tests for RateLawAnalyzer._makeSegmentStarts."""
-
-    def test_single_segment_when_no_changepoints(self) -> None:
-        if IGNORE_TESTS:
-            return
-        analyzer = _make_analyzer(_make_model(MM_ANTIMONY_MODEL), [0, NUM_POINT - 1])
-        self.assertEqual(analyzer._makeSegmentStarts(), [0])
-
-    def test_segments_from_changepoints(self) -> None:
-        if IGNORE_TESTS:
-            return
-        analyzer = _make_analyzer(_make_model(MM_ANTIMONY_MODEL), [0, 10, 25, NUM_POINT - 1])
-        self.assertEqual(analyzer._makeSegmentStarts(), [0, 10, 25])
-
-    def test_empty_boundaries_give_single_segment(self) -> None:
-        if IGNORE_TESTS:
-            return
-        analyzer = _make_analyzer(_make_model(MM_ANTIMONY_MODEL), [])
-        self.assertEqual(analyzer._makeSegmentStarts(), [0])
-
-
 class TestRateLawEstimates(unittest.TestCase):
     """Tests for RateLawAnalyzer._makeRateLawEstimates."""
 
     def test_linear_rate_law_estimates_are_exact(self) -> None:
-        """For mass-action (linear) rate laws, the linear approximation is exact."""
+        """For mass-action (linear) rate laws, the one-step linearization is exact."""
         if IGNORE_TESTS:
             return
         analyzer = _make_analyzer(_make_model(LINEAR_ANTIMONY_MODEL), [0, 25, NUM_POINT - 1])
         for reaction_id in analyzer._rate_law_dct:
             true_arr = analyzer._timecourse_df[reaction_id].to_numpy()
             est_arr = analyzer._makeRateLawEstimates(reaction_id).to_numpy()
-            np.testing.assert_allclose(est_arr, true_arr, rtol=1e-4, atol=1e-8)
+            self.assertTrue(np.isnan(est_arr[0]))  # no previous step at the first timepoint
+            np.testing.assert_allclose(est_arr[1:], true_arr[1:], rtol=1e-4, atol=1e-8)
 
-    def test_estimates_match_true_rates_at_segment_starts(self) -> None:
-        """At each segment's starting point, the estimate equals the true rate."""
+    def test_estimates_are_one_step_back(self) -> None:
+        """est(t) approximates the true rate at t, linearized from t - 1 (O(dt^2) error)."""
         if IGNORE_TESTS:
             return
         analyzer = _make_analyzer(_make_model(MM_ANTIMONY_MODEL), [0, 25, NUM_POINT - 1])
         r1_id, _ = _get_reaction_ids(MM_ANTIMONY_MODEL)
-        est_ser = analyzer._makeRateLawEstimates(r1_id)
+        est_arr = analyzer._makeRateLawEstimates(r1_id).to_numpy()
         true_arr = analyzer._timecourse_df[r1_id].to_numpy()
-        for start in [0, 25]:
-            np.testing.assert_allclose(est_ser.iloc[start], true_arr[start], rtol=1e-6, atol=1e-8)
+        self.assertTrue(np.isnan(est_arr[0]))  # no previous step at the first timepoint
+        np.testing.assert_allclose(est_arr[1:], true_arr[1:], rtol=1e-2, atol=1e-8)
 
     def test_estimates_series_index_matches_timecourse(self) -> None:
         if IGNORE_TESTS:
@@ -338,8 +323,8 @@ class TestLocalParameters(unittest.TestCase):
     def test_estimates_use_local_parameters(self) -> None:
         """A rate law using a local parameter is estimated with its value.
 
-        r1 = k*S/Km is linear in S, so the piecewise linear approximation is
-        exact when Km and k are substituted correctly.
+        r1 = k*S/Km is linear in S, so the one-step linearization is exact when
+        Km and k are substituted correctly.
         """
         if IGNORE_TESTS:
             return
@@ -347,7 +332,158 @@ class TestLocalParameters(unittest.TestCase):
         analyzer = _make_analyzer(model, [0, 25, NUM_POINT - 1])
         est_arr = analyzer._makeRateLawEstimates('r1').to_numpy()
         true_arr = analyzer._timecourse_df['r1'].to_numpy()
-        np.testing.assert_allclose(est_arr, true_arr, rtol=1e-4, atol=1e-8)
+        self.assertTrue(np.isnan(est_arr[0]))  # no previous step at the first timepoint
+        np.testing.assert_allclose(est_arr[1:], true_arr[1:], rtol=1e-4, atol=1e-8)
+
+
+class TestPlotRateLawLinearization(unittest.TestCase):
+    """Tests for RateLawAnalyzer.plotRateLawLinearization (synthetic model)."""
+
+    def setUp(self) -> None:
+        if IGNORE_TESTS:
+            return
+        self._fig, self._ax = plt.subplots()
+
+    def tearDown(self) -> None:
+        if IGNORE_TESTS:
+            return
+        plt.close("all")
+
+    def _make_mm_analyzer(self, boundaries: List[int] | None = None) -> rla.RateLawAnalyzer:
+        if boundaries is None:
+            boundaries = [0, 25, NUM_POINT - 1]
+        return _make_analyzer(_make_model(MM_ANTIMONY_MODEL), boundaries)
+
+    def test_plots_simulated_and_estimated_lines(self) -> None:
+        """Two lines are drawn: the simulated rate and the linear estimate."""
+        if IGNORE_TESTS:
+            return
+        analyzer = self._make_mm_analyzer()
+        r1_id, _ = _get_reaction_ids(MM_ANTIMONY_MODEL)
+        with patch("matplotlib.pyplot.show"):
+            analyzer.plotRateLawLinearization(r1_id, ax=self._ax)
+        lines = self._ax.get_lines()
+        self.assertGreaterEqual(len(lines), 2)
+        true_arr = analyzer._timecourse_df[r1_id].to_numpy()
+        est_arr = analyzer._makeRateLawEstimates(r1_id).to_numpy()
+        np.testing.assert_allclose(np.asarray(lines[0].get_ydata()), true_arr)
+        np.testing.assert_allclose(np.asarray(lines[1].get_ydata()), est_arr)
+
+    def test_sets_title_and_axis_labels(self) -> None:
+        if IGNORE_TESTS:
+            return
+        analyzer = self._make_mm_analyzer()
+        r1_id, _ = _get_reaction_ids(MM_ANTIMONY_MODEL)
+        with patch("matplotlib.pyplot.show"):
+            analyzer.plotRateLawLinearization(r1_id, ax=self._ax)
+        self.assertEqual(self._ax.get_title(), f"Rate Law Linearization for Reaction {r1_id}")
+        self.assertEqual(self._ax.get_xlabel(), "Time")
+        self.assertEqual(self._ax.get_ylabel(), "Rate")
+
+    def test_legend_lists_both_series(self) -> None:
+        if IGNORE_TESTS:
+            return
+        analyzer = self._make_mm_analyzer()
+        r1_id, _ = _get_reaction_ids(MM_ANTIMONY_MODEL)
+        with patch("matplotlib.pyplot.show"):
+            analyzer.plotRateLawLinearization(r1_id, ax=self._ax)
+        legend = self._ax.get_legend()
+        self.assertIsNotNone(legend)
+        self.assertEqual([t.get_text() for t in legend.get_texts()], ["Simulated Rate", "Estimated Rate"]) # type: ignore
+
+    def test_draws_a_vline_per_interior_boundary(self) -> None:
+        """One vertical line per boundary b with 0 < b < NUM_POINT (the two rate lines plus those)."""
+        if IGNORE_TESTS:
+            return
+        analyzer = self._make_mm_analyzer()  # boundaries [0, 25, NUM_POINT - 1]
+        r1_id, _ = _get_reaction_ids(MM_ANTIMONY_MODEL)
+        with patch("matplotlib.pyplot.show"):
+            analyzer.plotRateLawLinearization(r1_id, ax=self._ax)
+        expected_vlines = sum(1 for b in analyzer._boundaries if 0 < b < NUM_POINT)
+        self.assertEqual(len(self._ax.get_lines()), 2 + expected_vlines)
+
+    def test_creates_figure_when_no_ax_given(self) -> None:
+        """With ax=None a new figure is created and the plot drawn on it."""
+        if IGNORE_TESTS:
+            return
+        analyzer = self._make_mm_analyzer()
+        r1_id, _ = _get_reaction_ids(MM_ANTIMONY_MODEL)
+        nfig_before = len(plt.get_fignums())
+        with patch("matplotlib.pyplot.show"):
+            analyzer.plotRateLawLinearization(r1_id)  # ax=None -> new figure
+        self.assertEqual(len(plt.get_fignums()), nfig_before + 1)
+        fig = plt.figure(plt.get_fignums()[-1])
+        self.assertGreaterEqual(len(fig.axes[0].get_lines()), 2)
+
+
+@unittest.skipIf(not _HAS_BIOMODELS, "BioModels directory not found")
+class TestPlotRateLawLinearizationRealModels(unittest.TestCase):
+    """End-to-end: generate rate-law linearization plots for real BioModels.
+
+    Each test constructs a RateLawAnalyzer (which requires a valid PSD prediction)
+    and saves one plot per reaction to a temp directory, then verifies the files.
+    A model without any valid PSD prediction is skipped rather than failing, since
+    that reflects data availability rather than a defect in the plotting code.
+    """
+
+    def setUp(self) -> None:
+        if IGNORE_TESTS:
+            return
+        self._tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self) -> None:
+        if IGNORE_TESTS:
+            return
+        plt.close("all")
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def _plot_model_reactions(self, model_num: int) -> List[str]:
+        """Plot every reaction of the model; return the saved file paths.
+
+        Raises:
+            ValueError: If the model has no valid PSD prediction (default threshold).
+        """
+        analyzer = rla.RateLawAnalyzer(biomodel_id=model_num)
+        saved: List[str] = []
+        for reaction_id in analyzer._rate_law_dct:
+            fig, ax = plt.subplots(figsize=(10, 6))
+            with patch("matplotlib.pyplot.show"):
+                analyzer.plotRateLawLinearization(reaction_id, ax=ax)
+            out_path = os.path.join(self._tmpdir, f"rate_law_linearization_{model_num}_{reaction_id}.png")
+            fig.savefig(out_path)
+            plt.close(fig)
+            saved.append(out_path)
+        return saved
+
+    def _assert_plots_saved(self, model_num: int) -> None:
+        if IGNORE_TESTS:
+            return
+        try:
+            saved = self._plot_model_reactions(model_num)
+        except ValueError as e:
+            self.skipTest(f"No valid PSD prediction for model {model_num}: {e}")
+        self.assertGreater(len(saved), 0)
+        for path in saved:
+            self.assertTrue(os.path.exists(path), f"missing plot file {path}")
+            self.assertGreater(os.path.getsize(path), 0, f"empty plot file {path}")
+
+    def test_plots_biomodel_5(self) -> None:
+        self._assert_plots_saved(5)
+
+    def test_plots_biomodel_10(self) -> None:
+        self._assert_plots_saved(10)
+
+    def test_plots_biomodel_904(self) -> None:
+        self._assert_plots_saved(904)
+
+    def test_plot_all(self) -> None:
+        """Plot all BioModels with valid PSD predictions (slow)."""
+        if IGNORE_TESTS:
+            return
+        model_num = 904
+        analyzer = rla.RateLawAnalyzer(biomodel_id=model_num)
+        analyzer.plotAllRateLawLinearizations(ymax=0.0002)  # set y-axis limit to 1.0 for better visibility
+        #plt.show()
 
 
 if __name__ == "__main__":

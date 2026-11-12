@@ -6,6 +6,7 @@ __pycache__/
 *$py.class
 .DS_Store
 archive/*
+notebooks/.ipynb*
 data/serialize/*
 data/*
 */score.csv

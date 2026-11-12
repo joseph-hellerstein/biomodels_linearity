@@ -7,7 +7,7 @@ from src.perturbation_analyzer import PerturbationAnalyzer
 from src.piecewise_system_discovery import PiecewiseSystemDiscovery
 from src.psd_analyzer import PSDAnalyzer
 from src.score import Score
-from src.simulator import Simulator
+from src.rate_law_analyzer import RateLawAnalyzer
 from src.system_discovery import discoverNetwork
 from src.timecourse import Timecourse
 from src.cumulative_segment_curve import CumulativeSegmentCurve
@@ -239,6 +239,18 @@ if IS_ALL:
 if IS_ALL:
     PSDAnalyzer.makeAUCCDFPlots()
     filename = "piecewise_auc_cdf.pdf"
+    path = os.path.join(cn.PAPER_DIR, filename)
+    plt.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+    plt.close()
+
+#######################
+# Reaction relative error plots
+#######################
+if IS_ALL:
+    model_num = 904
+    analyzer = RateLawAnalyzer(biomodel_id=model_num)
+    analyzer.plotAllRateLawLinearizations(ymax=0.0002)  # set y-axis limit to 1.0 for better visibility
+    filename = "reaction_relative_error_904.pdf"
     path = os.path.join(cn.PAPER_DIR, filename)
     plt.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
     plt.close()
