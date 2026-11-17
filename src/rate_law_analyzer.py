@@ -516,7 +516,9 @@ class RateLawAnalyzer(object):
         plt.tight_layout()
         plt.show()
 
-    def plotAllRateLawLinearizations(self, ymax: float | None = None) -> None:
+    def plotAllRateLawLinearizations(self, ymax: float | None = None, ax=None,
+            max_points: int | None = 2000, max_species: int | None = None,
+            legends: list[str] | None = None) -> None:
         '''
         Plots the piecewise linear rate estimates against the simulated rates for all reactions.
 
@@ -524,6 +526,10 @@ class RateLawAnalyzer(object):
             ncol (int, optional): Number of columns in the subplot grid. Defaults to 2 
             is_reaction_rate (bool, optional):
                 Whether to plot the reaction rate or relative error in estimate relative error in estimate
+            max_points (int, optional): Maximum number of time points to plot; the relative error
+                DataFrame is stride-downsampled when longer. Set None to disable downsampling.
+            max_species (int, optional): Maximum number of species to plot; the relative error
+                DataFrame is filtered to the first max_species species. Set None to disable filtering.
         ''' 
 
         # Construct the true and estimated rate DataFrames, aligning them by dropping species columns from the true rates.
@@ -542,23 +548,42 @@ class RateLawAnalyzer(object):
             rel_error_df[col] = rel_error_df[col] / dt
         rel_error_df = rel_error_df.fillna(0)  # Replace NaN with 0 for plotting
 
+        # Select the first max_species species for plotting, if specified.
+        species_max_ser = rel_error_df.sum()
+        species_max_ser = species_max_ser.sort_values(ascending=False)
+        rel_error_df = rel_error_df[species_max_ser.index]
+        if max_species is not None:
+            rel_error_df = rel_error_df.iloc[:, :max_species]
+
+        # Downsample the time axis so long timecourses plot quickly. A uniform stride
+        # keeps the x-axis proportional to time; dt above was computed on the full index,
+        # and the boundary axvlines below use true_rate_df's original times.
+        if max_points is not None and len(rel_error_df) > max_points:
+            step = int(np.ceil(len(rel_error_df) / max_points))
+            rel_error_df = rel_error_df.iloc[::step]
+
         # Plot the relative errors as a stacked area. fill_between draws one
         # polygon per reaction instead of one bar patch per time point, which
         # is orders of magnitude faster for long timecourses.
-        _, ax = plt.subplots(figsize=(10, 6))
+        if ax is None:
+            _, ax = plt.subplots(figsize=(10, 6))
         bottom = np.zeros(len(rel_error_df))
         for col in rel_error_df.columns:
             top = bottom + rel_error_df[col].to_numpy()
             ax.fill_between(rel_error_df.index, bottom, top, label=col)
             bottom = top
-        ax.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+        if legends is not None:
+            ax.legend(legends, loc='upper right', bbox_to_anchor=(1.15, 1))
+        else:
+            ax.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
         ax.set_xlabel('time')
         ax.set_ylabel('time normalized, relative error')
         #ax.set_ylim(0, rel_error_df.max().max())
         if ymax is not None:
             ax.set_ylim(0, ymax)
         else:
-            ax.set_ylim(0, 1)
+            ymax_val = rel_error_df.max().max()
+            ax.set_ylim(0, ymax_val)
 
         # Plot the segments
         for boundary in self._boundaries:

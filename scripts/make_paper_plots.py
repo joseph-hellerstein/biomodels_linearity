@@ -13,7 +13,10 @@ from src.timecourse import Timecourse
 from src.cumulative_segment_curve import CumulativeSegmentCurve
 
 IS_PLOT = False
-IS_ALL = True
+IS_ALL = False
+
+# Example models
+MODEL_NUMS = [745, 904, 821, 697]
 
 if not IS_PLOT:
     import matplotlib # type: ignore
@@ -155,12 +158,10 @@ if IS_ALL:
 #######################
 # Examples of piecewise predictions
 #######################
-model_nums = [799, 799, 799, 799]    # test only
-model_nums = [745, 904, 821, 697]
 if IS_ALL:
     t_fig, t_axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
     extended_plot_options_list: list = []
-    for idx, model_num in enumerate(model_nums):
+    for idx, model_num in enumerate(MODEL_NUMS):
         ax = t_axes[idx]
         extended_plot_options = PSDAnalyzer.plotBestLinearFits(model_id=model_num, ax=ax,
                 min_accuracy=0.8, accuracy_statistic="p50", num_true_point=15)
@@ -178,7 +179,7 @@ if IS_ALL:
     plt.close()
     # Do the segment curve
     c_fig, c_axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
-    for idx, model_num in enumerate(model_nums):
+    for idx, model_num in enumerate(MODEL_NUMS):
         extended_plot_options = extended_plot_options_list[idx]
         ax = c_axes[idx]
         boundaries = extended_plot_options.psd.boundaries
@@ -253,4 +254,24 @@ if IS_ALL:
     filename = "reaction_relative_error_904.pdf"
     path = os.path.join(cn.PAPER_DIR, filename)
     plt.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+    plt.close()
+
+
+#######################
+# Rate law linearization plots
+######################"
+if True:
+    fig, axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
+    for idx, model_num in enumerate(MODEL_NUMS):
+        ax = axes[idx]
+        analyzer = RateLawAnalyzer(biomodel_id=model_num)
+        analyzer.plotAllRateLawLinearizations(ax=ax, ymax=0.0002,
+                max_species=3, legends=["J1", "J2", "J3"])  # set y-axis limit to 1.0 for better visibility
+        #ax.legend([])
+        if idx > 0:
+            ax.set_ylabel("")
+            ax.set_xlabel("")
+    filename = f"reaction_relative_error.pdf"
+    path = os.path.join(cn.PAPER_DIR, filename)
+    fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
     plt.close()

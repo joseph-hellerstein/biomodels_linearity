@@ -480,9 +480,9 @@ class TestPlotRateLawLinearizationRealModels(unittest.TestCase):
         """Plot all BioModels with valid PSD predictions (slow)."""
         if IGNORE_TESTS:
             return
-        model_num = 904
+        model_num = 697
         analyzer = rla.RateLawAnalyzer(biomodel_id=model_num)
-        analyzer.plotAllRateLawLinearizations(ymax=0.0002)  # set y-axis limit to 1.0 for better visibility
+        analyzer.plotAllRateLawLinearizations(ymax=1000)  # set y-axis limit to 1.0 for better visibility
         #plt.show()
 
 
