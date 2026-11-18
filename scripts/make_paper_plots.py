@@ -261,12 +261,15 @@ if IS_ALL:
 # Rate law linearization plots
 ######################"
 if True:
+    legend_letters = ["A", "B", "C", "D"]
     fig, axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
+    max_species = 3  # Limit the number of species to plot for better visibility
     for idx, model_num in enumerate(MODEL_NUMS):
         ax = axes[idx]
         analyzer = RateLawAnalyzer(biomodel_id=model_num)
+        legends = [f"{legend_letters[idx]}{i+1}" for i in range(max_species)]
         analyzer.plotAllRateLawLinearizations(ax=ax, ymax=0.0002,
-                max_species=3, legends=["J1", "J2", "J3"])  # set y-axis limit to 1.0 for better visibility
+                max_species=max_species, legends=legends)
         #ax.legend([])
         if idx > 0:
             ax.set_ylabel("")
