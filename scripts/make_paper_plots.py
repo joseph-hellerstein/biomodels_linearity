@@ -263,10 +263,12 @@ if IS_ALL:
 if True:
     legend_letters = ["A", "B", "C", "D"]
     fig, axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
-    max_species = 3  # Limit the number of species to plot for better visibility
     for idx, model_num in enumerate(MODEL_NUMS):
+        max_species = 3  # Limit the number of species to plot for better visibility
         ax = axes[idx]
         analyzer = RateLawAnalyzer(biomodel_id=model_num)
+        if idx >= 2:
+            max_species = 2
         legends = [f"{legend_letters[idx]}{i+1}" for i in range(max_species)]
         analyzer.plotAllRateLawLinearizations(ax=ax, ymax=0.0002,
                 max_species=max_species, legends=legends)
