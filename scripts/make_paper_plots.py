@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt # type: ignore
 import numpy as np  # type: ignore
 import os
 import pandas as pd # type: ignore
-from typing import Optional
+from typing import Optional, List
 
 NUM_POINT = cn.NUM_POINT
 
@@ -80,6 +80,51 @@ def plotPerturbation(metric_name: str, threshold: float = 0.001, is_analyze_spec
     plt.title(f"{metric_name} {aggregation_type} CDF")
     if is_plot:
         plt.show()
+
+def plotTimecourses(model_nums: List[int], timecourse_filename: str, segment_filename: Optional[str]=None,
+        is_yticklables: bool = True):
+    t_fig, t_axes = plt.subplots(1, len(model_nums), figsize=(10, 4), constrained_layout=True)
+    extended_plot_options_list: list = []
+    for idx, model_num in enumerate(model_nums):
+        ax = t_axes[idx]
+        extended_plot_options = PSDAnalyzer.plotBestLinearFits(model_id=model_num, ax=ax,
+                min_accuracy=0.8, accuracy_statistic="p50", num_true_point=15)
+        extended_plot_options_list.append(extended_plot_options)
+        text = "1 segment" if extended_plot_options.num_changepoint == 0 else f"{extended_plot_options.num_changepoint + 1} segments"
+        title = f"{model_num}: {text}"
+        ax.set_title(title)
+        if idx > 0:
+            ax.set_ylabel("")
+            ax.set_xlabel("")
+        if not is_yticklables:
+            ax.set_yticklabels([])
+        ax.legend([])
+    path = os.path.join(cn.PAPER_DIR, timecourse_filename)
+    t_fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+    plt.close()
+    # Do the segment curve
+    if segment_filename is None:
+        return
+    c_fig, c_axes = plt.subplots(1, len(model_nums), figsize=(10, 4), constrained_layout=True)
+    for idx, model_num in enumerate(MODEL_NUMS):
+        extended_plot_options = extended_plot_options_list[idx]
+        ax = c_axes[idx]
+        boundaries = extended_plot_options.psd.boundaries
+        csc = CumulativeSegmentCurve(boundaries)
+        csc.plot(ax=ax)
+        title = f"AUC={extended_plot_options.auc:.2f}"
+        ax.set_title(title)
+        ax.set_xlabel("Normalized Segment Length")
+        ax.set_ylabel("Cumulative Area")
+        ax.legend([])
+        if idx > 0:
+            ax.set_ylabel("")
+            ax.set_xlabel("")
+        if not is_yticklables:
+            ax.set_yticklabels([])
+    path = os.path.join(cn.PAPER_DIR, segment_filename)
+    c_fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+    plt.close()
 
 ################################################
 # Linear Fits
@@ -159,44 +204,15 @@ if IS_ALL:
 # Examples of piecewise predictions
 #######################
 if IS_ALL:
-    t_fig, t_axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
-    extended_plot_options_list: list = []
-    for idx, model_num in enumerate(MODEL_NUMS):
-        ax = t_axes[idx]
-        extended_plot_options = PSDAnalyzer.plotBestLinearFits(model_id=model_num, ax=ax,
-                min_accuracy=0.8, accuracy_statistic="p50", num_true_point=15)
-        extended_plot_options_list.append(extended_plot_options)
-        text = "1 segment" if extended_plot_options.num_changepoint == 0 else f"{extended_plot_options.num_changepoint + 1} segments"
-        title = f"{model_num}: {text}"
-        ax.set_title(title)
-        if idx > 0:
-            ax.set_ylabel("")
-            ax.set_xlabel("")
-        ax.legend([])
-    filename = "example_timecourse.pdf"
-    path = os.path.join(cn.PAPER_DIR, filename)
-    t_fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
-    plt.close()
-    # Do the segment curve
-    c_fig, c_axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
-    for idx, model_num in enumerate(MODEL_NUMS):
-        extended_plot_options = extended_plot_options_list[idx]
-        ax = c_axes[idx]
-        boundaries = extended_plot_options.psd.boundaries
-        csc = CumulativeSegmentCurve(boundaries)
-        csc.plot(ax=ax)
-        title = f"AUC={extended_plot_options.auc:.2f}"
-        ax.set_title(title)
-        ax.set_xlabel("Normalized Segment Length")
-        ax.set_ylabel("Cumulative Area")
-        ax.legend([])
-        if idx > 0:
-            ax.set_ylabel("")
-            ax.set_xlabel("")
-    filename = "example_segment_curve_examples.pdf"
-    path = os.path.join(cn.PAPER_DIR, filename)
-    c_fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
-    plt.close()
+    plotTimecourses(model_nums=MODEL_NUMS, timecourse_filename="example_timecourses.pdf",
+            segment_filename="example_segment_curves.pdf")
+
+#######################
+# Near linear models
+#######################
+if IS_ALL:
+    plotTimecourses(model_nums=[830, 851, 777, 745, 961, 966], timecourse_filename="near_linear_models.pdf",
+            is_yticklables=False)
 
 ########################
 # Distribution of longest segment for models with different min_accuarcy
@@ -260,7 +276,7 @@ if IS_ALL:
 #######################
 # Rate law linearization plots
 ######################"
-if True:
+if IS_ALL:
     legend_letters = ["A", "B", "C", "D"]
     fig, axes = plt.subplots(1, 4, figsize=(10, 4), constrained_layout=True)
     for idx, model_num in enumerate(MODEL_NUMS):
@@ -280,3 +296,15 @@ if True:
     path = os.path.join(cn.PAPER_DIR, filename)
     fig.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
     plt.close()
+
+#######################
+# Particular rate law linearization plots
+######################"
+if True:
+    for model_num in [745, 821]:
+        analyzer = RateLawAnalyzer(biomodel_id=model_num)
+        analyzer.plotAllRateLawLinearizations(ymax=0.0002)
+        filename = f"reaction_relative_error_{model_num}.pdf"
+        path = os.path.join(cn.PAPER_DIR, filename)
+        plt.savefig(path, bbox_inches="tight", dpi=300)  # type: ignore
+        plt.close()
